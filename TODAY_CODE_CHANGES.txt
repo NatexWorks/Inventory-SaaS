@@ -1,0 +1,1912 @@
+Code changes made today, with full source for the files I edited.
+
+File: D:\Web\SaaS\inventory-saas\src\app\addProducts\AddProductClient.jsx
+```jsx
+"use client";
+
+import { useEffect, useState } from "react";
+import ProductForm from "../components/productForm";
+
+export default function AddProductClient({ id }) {
+  const [Form, setFormData] = useState({
+    name: "",
+    price: "",
+    stock: "",
+    costPrice: "",
+    category: "",
+    sku: "",
+    description: "",
+  });
+
+  // handleChange function to update form state on input change
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prevFormData) => ({
+      ...prevFormData,
+      [name]: value,
+    }));
+  };
+
+  // Handles the form submit event and collects values from the inputs
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    // Build a plain object so it can be sent as JSON to the API
+    const data = {
+      name: formData.get("name"),
+      price: formData.get("price"),
+      stock: formData.get("stock"),
+      costPrice: formData.get("costPrice"),
+      category: formData.get("category"),
+      sku: formData.get("sku"),
+      description: formData.get("description"),
+    };
+    //  formData.append("image", image);
+    console.log(data);
+    // Send the product data to the backend API
+
+    setFormData({
+      name: "",
+      price: "",
+      stock: "",
+      costPrice: "",
+      category: "",
+      sku: "",
+      description: "",
+    });
+    await createProducts(data);
+  };
+
+  // Calls the API route that stores a new product in MongoDB
+  async function createProducts(data) {
+    try {
+      if (id) {
+        await fetch(`/api/product/${id}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(data),
+        });
+      } else {
+        await fetch("/api/product", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(data),
+        });
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  // edit
+  useEffect(() => {
+    async function loadProduct() {
+      if (!id) return;
+
+      const res = await fetch(`/api/product/${id}`);
+      const data = await res.json();
+      console.log("Fetched product data:", data);
+      console.log("Setting form data with:", data.product);
+      setFormData(data.product);
+    }
+
+    loadProduct();
+  }, [id]);
+
+  return (
+    <div className="min-h-[calc(100vh-4rem)] bg-[radial-gradient(circle_at_top_left,_rgba(99,102,241,0.14),_transparent_30%),linear-gradient(180deg,#eff4ff_0%,#f8fbff_45%,#eef2ff_100%)] px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
+      <div className="mx-auto flex max-w-7xl flex-col gap-6">
+        <section className="rounded-[28px] border border-white/70 bg-white/80 px-5 py-5 shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-indigo-500">Products</p>
+              <h1 className="mt-2 text-3xl font-bold text-slate-900">{id ? "Edit Product" : "Add New Product"}</h1>
+              <p className="mt-2 max-w-2xl text-sm text-slate-500">
+                Create a new catalog item or update an existing one with pricing, stock, and category details.
+              </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Mode</p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">{id ? "Editing" : "Creating"}</p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Fields</p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">Name, price, stock</p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Status</p>
+                <p className="mt-1 text-sm font-semibold text-emerald-600">Ready to save</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <ProductForm
+          formData={Form}
+          handleChange={handleChange}
+          handleSubmit={handleSubmit}
+          change={id ? "Edit Product" : "Add Product"}
+        />
+      </div>
+    </div>
+  );
+}
+```
+
+File: D:\Web\SaaS\inventory-saas\src\app\api\product\route.js
+```js
+import { NextResponse } from "next/server";
+import dbConnect from "@/app/lib/db";
+import Product from "@/app/models/productSchema"; // IMPORTANT
+
+// POST /api/product
+// Creates a new product record in MongoDB using the request body
+export async function POST(request) {
+  await dbConnect();
+
+  // Parse the JSON payload sent from the client form
+  const data = await request.json();
+
+  // Save the product document into the collection
+
+  try{
+  const product = await Product.create(data);
+  
+  return NextResponse.json({
+    message: "Product added successfully",
+    product,
+  });
+
+  } catch(error){
+    return NextResponse.json(
+      {error :error.message},
+      {status:400}
+    );
+  }
+
+}
+
+// GET /api/product
+// Returns all saved products from the database
+export async function GET(request) {
+  try {
+    await dbConnect();
+
+    const { searchParams } = new URL(request.url);
+    const search = searchParams.get("search") || "";
+    const page = Number(searchParams.get("page")) || 1;
+    const limit = 10;
+
+    const filter = {
+      $or: [
+        { name: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
+        { category: { $regex: search, $options: "i" } },
+        { sku: { $regex: search, $options: "i" } },
+      ],
+    };
+
+    const products = await Product.find(filter)
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit);
+
+    const totalProducts = await Product.countDocuments(filter);
+    
+    return NextResponse.json({
+      message: "Products fetched successfully",
+      products,
+      pagination: {
+        page,
+        limit,
+        totalProducts,
+        totalPages: Math.ceil(totalProducts / limit)
+      }
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { message: "Error fetching products", error: error.message },
+      { status: 500 }
+    );
+  }
+}
+```
+
+File: D:\Web\SaaS\inventory-saas\src\app\categories\page.jsx
+```jsx
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import {
+  MdCategory,
+  MdInventory,
+  MdSearch,
+  MdTrendingUp,
+} from "react-icons/md";
+import { fetchCategories } from "../components/productFetch";
+
+function formatCurrency(value) {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(Number(value || 0));
+}
+
+function getCategoryGroups(products) {
+  return products.reduce((acc, product) => {
+    const name = product.category || "Uncategorized";
+
+    if (!acc[name]) {
+      acc[name] = {
+        name,
+        products: [],
+        totalValue: 0,
+        lowStock: 0,
+        outOfStock: 0,
+        description: product.description || "General product bucket",
+      };
+    }
+
+    acc[name].products.push(product);
+    acc[name].totalValue += Number(product.price || 0) * Number(product.stock || 0);
+
+    if (Number(product.stock || 0) <= 0) {
+      acc[name].outOfStock += 1;
+    } else if (Number(product.stock || 0) <= 5) {
+      acc[name].lowStock += 1;
+    }
+
+    if (!acc[name].description && product.description) {
+      acc[name].description = product.description;
+    }
+
+    return acc;
+  }, {});
+}
+
+function CategoryCard({ category }) {
+  const productCount = category.products.length;
+  const topProduct = category.products[0];
+
+  return (
+    <article className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-500">
+            Category
+          </p>
+          <h3 className="mt-2 text-xl font-semibold text-slate-900">{category.name}</h3>
+          <p className="mt-2 text-sm text-slate-500">{category.description}</p>
+        </div>
+        <div className="rounded-2xl bg-indigo-50 p-3 text-indigo-600">
+          <MdCategory className="text-2xl" />
+        </div>
+      </div>
+
+      <div className="mt-5 grid grid-cols-3 gap-3">
+        <div className="rounded-2xl bg-slate-50 p-3">
+          <p className="text-xs text-slate-500">Products</p>
+          <p className="mt-1 text-lg font-semibold text-slate-900">{productCount}</p>
+        </div>
+        <div className="rounded-2xl bg-slate-50 p-3">
+          <p className="text-xs text-slate-500">Low Stock</p>
+          <p className="mt-1 text-lg font-semibold text-amber-600">{category.lowStock}</p>
+        </div>
+        <div className="rounded-2xl bg-slate-50 p-3">
+          <p className="text-xs text-slate-500">Out</p>
+          <p className="mt-1 text-lg font-semibold text-rose-600">{category.outOfStock}</p>
+        </div>
+      </div>
+
+      <div className="mt-5 rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium text-slate-900">Top product</p>
+            <p className="mt-1 text-sm text-slate-500">{topProduct?.name || "No products yet"}</p>
+          </div>
+          <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200">
+            {formatCurrency(topProduct?.price)}
+          </span>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+export default function CategoriesPage() {
+  const [products, setProducts] = useState([]);
+  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadCategories() {
+      try {
+        setLoading(true);
+        setError("");
+        const items = await fetchCategories();
+
+        if (!active) {
+          return;
+        }
+
+        setProducts(items);
+      } catch (err) {
+        if (!active) {
+          return;
+        }
+
+        setError(err.message || "Failed to load categories");
+        setProducts([]);
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadCategories();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const categories = useMemo(() => {
+    const grouped = getCategoryGroups(products);
+
+    return Object.values(grouped)
+      .filter((category) => category.name.toLowerCase().includes(search.toLowerCase()))
+      .sort((a, b) => b.products.length - a.products.length);
+  }, [products, search]);
+
+  const totals = useMemo(() => {
+    const totalProducts = products.length;
+    const totalCategories = categories.length;
+    const totalValue = categories.reduce((sum, category) => sum + category.totalValue, 0);
+    const leadingCategory = categories[0];
+
+    return {
+      totalProducts,
+      totalCategories,
+      totalValue,
+      leadingCategory: leadingCategory?.name || "N/A",
+      leadingCount: leadingCategory?.products.length || 0,
+    };
+  }, [categories, products.length]);
+
+  return (
+    <div className="min-h-[calc(100vh-4rem)] bg-[radial-gradient(circle_at_top_left,_rgba(99,102,241,0.14),_transparent_30%),linear-gradient(180deg,#eff4ff_0%,#f8fbff_45%,#eef2ff_100%)] px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
+      <div className="mx-auto flex max-w-7xl flex-col gap-6">
+        <section className="rounded-[28px] border border-white/70 bg-white/80 px-5 py-5 shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-indigo-500">
+                Categories
+              </p>
+              <h1 className="mt-2 text-3xl font-bold text-slate-900">Category Overview</h1>
+              <p className="mt-2 max-w-2xl text-sm text-slate-500">
+                View product groups, stock spread, and category-level inventory value in one place.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+              <MdSearch className="text-xl text-slate-400" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search categories..."
+                className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400 sm:w-64"
+              />
+            </div>
+          </div>
+        </section>
+
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-3xl border border-white/70 bg-white/85 p-4 shadow-[0_16px_35px_rgba(15,23,42,0.08)] backdrop-blur">
+            <p className="text-sm font-medium text-slate-500">Total Categories</p>
+            <p className="mt-2 text-2xl font-bold text-slate-900">{totals.totalCategories}</p>
+            <p className="mt-1 text-xs text-slate-500">Unique product groups</p>
+          </div>
+          <div className="rounded-3xl border border-white/70 bg-white/85 p-4 shadow-[0_16px_35px_rgba(15,23,42,0.08)] backdrop-blur">
+            <p className="text-sm font-medium text-slate-500">Total Products</p>
+            <p className="mt-2 text-2xl font-bold text-slate-900">{totals.totalProducts}</p>
+            <p className="mt-1 text-xs text-slate-500">Across all categories</p>
+          </div>
+          <div className="rounded-3xl border border-white/70 bg-white/85 p-4 shadow-[0_16px_35px_rgba(15,23,42,0.08)] backdrop-blur">
+            <p className="text-sm font-medium text-slate-500">Inventory Value</p>
+            <p className="mt-2 text-2xl font-bold text-slate-900">{formatCurrency(totals.totalValue)}</p>
+            <p className="mt-1 text-xs text-slate-500">Category-based estimate</p>
+          </div>
+          <div className="rounded-3xl border border-white/70 bg-white/85 p-4 shadow-[0_16px_35px_rgba(15,23,42,0.08)] backdrop-blur">
+            <p className="text-sm font-medium text-slate-500">Top Category</p>
+            <p className="mt-2 text-2xl font-bold text-slate-900">{totals.leadingCategory}</p>
+            <p className="mt-1 text-xs text-slate-500">{totals.leadingCount} products</p>
+          </div>
+        </section>
+
+        {error ? (
+          <div className="rounded-3xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-700">
+            {error}
+          </div>
+        ) : null}
+
+        <section className="rounded-[28px] border border-white/70 bg-white/90 shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur">
+          <div className="flex items-center justify-between gap-4 border-b border-slate-100 px-5 py-4">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">Category Grid</h2>
+              <p className="text-sm text-slate-500">Grouped from your product catalog.</p>
+            </div>
+            <div className="hidden items-center gap-2 rounded-2xl bg-slate-50 px-3 py-2 text-sm text-slate-500 md:flex">
+              <MdTrendingUp className="text-lg text-indigo-500" />
+              Sorted by product count
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-3">
+              {Array.from({ length: 6 }, (_, index) => (
+                <div key={index} className="h-56 animate-pulse rounded-3xl bg-slate-100" />
+              ))}
+            </div>
+          ) : categories.length === 0 ? (
+            <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
+              <div className="rounded-3xl bg-indigo-50 p-4 text-indigo-600">
+                <MdCategory className="text-3xl" />
+              </div>
+              <h3 className="mt-4 text-xl font-semibold text-slate-900">No categories found</h3>
+              <p className="mt-2 max-w-md text-sm text-slate-500">
+                Add products with categories or try a different search term.
+              </p>
+              <Link
+                href="/addProducts"
+                className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-indigo-500"
+              >
+                <MdCategory className="text-lg" />
+                Add Product
+              </Link>
+            </div>
+          ) : (
+            <>
+              <div className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-3">
+                {categories.map((category) => (
+                  <CategoryCard key={category.name} category={category} />
+                ))}
+              </div>
+
+              <div className="border-t border-slate-100 px-5 py-4">
+                <div className="overflow-hidden rounded-3xl border border-slate-200">
+                  <table className="min-w-full divide-y divide-slate-200 bg-white text-left">
+                    <thead className="bg-slate-50">
+                      <tr className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                        <th className="px-4 py-3 font-semibold">Category</th>
+                        <th className="px-4 py-3 font-semibold">Description</th>
+                        <th className="px-4 py-3 font-semibold">Products</th>
+                        <th className="px-4 py-3 font-semibold">Value</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {categories.map((category) => (
+                        <tr key={category.name} className="text-sm text-slate-700">
+                          <td className="px-4 py-3 font-medium text-slate-900">{category.name}</td>
+                          <td className="px-4 py-3">{category.description}</td>
+                          <td className="px-4 py-3">{category.products.length}</td>
+                          <td className="px-4 py-3 font-medium text-slate-900">
+                            {formatCurrency(category.totalValue)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+        </section>
+      </div>
+    </div>
+  );
+}
+```
+
+File: D:\Web\SaaS\inventory-saas\src\app\components\ClientLayout.jsx
+```jsx
+"use client";
+
+import { useState } from "react";
+import Sidebar from "./Sidebar";
+import Navbar from "./Navbar";
+
+export default function ClientLayout({ children }) {
+  const [open, setOpen] = useState(true);
+const handleClick = () => {
+    setOpen(prev => !prev);
+    console.log("Menu icon clicked");
+  };
+  return (
+    <div className="flex min-h-screen bg-[#eef2ff]">
+      {/* Sidebar */}
+      <Sidebar className="fixed top-0 left-0 z-3" open={open} handleClick={handleClick} />
+
+      {/* Right side content */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <Navbar className="relative top-0 left-0 z-1" handleClick={handleClick} />
+
+        <main className="flex-1 min-w-0">
+          {children}
+        </main>
+      </div>
+    </div>
+  );
+}
+```
+
+File: D:\Web\SaaS\inventory-saas\src\app\components\productFetch.jsx
+```jsx
+"use client";
+
+export async function fetchProducts({ page = 1, search = "" } = {}) {
+  const res = await fetch(`/api/product?page=${page}&search=${search}`);
+  if (!res.ok) {
+    throw new Error("Failed to fetch products");
+  }
+
+  return res.json();
+}
+
+export async function fetchCategories() {
+  const res = await fetch("/api/category");
+
+  if (!res.ok) {
+    throw new Error("Failed to fetch categories");
+  }
+
+  const data = await res.json();
+  return data.categories ?? [];
+}
+```
+
+File: D:\Web\SaaS\inventory-saas\src\app\components\productForm.jsx
+```jsx
+"use client";
+const categories = [
+  "Electronics",
+  "Fashion",
+  "Home & Kitchen",
+  "Beauty & Personal Care",
+  "Sports & Fitness",
+  "Toys & Games",
+  "Automotive",
+  "Books",
+  "Health & Household",
+  "Grocery & Gourmet Food",
+  "Office & Stationery",
+  "Furniture",
+  "Jewelry & Watches",
+  "Garden & Outdoor",
+  "Pets & Veterinary Care",
+];
+
+function Field({ label, required = false, children, hint }) {
+  return (
+    <div>
+      <label className="mb-2 block text-sm font-semibold text-slate-700">
+        {label}
+        {required ? <span className="ml-1 text-rose-500">*</span> : null}
+      </label>
+      {children}
+      {hint ? <p className="mt-2 text-xs text-slate-400">{hint}</p> : null}
+    </div>
+  );
+}
+
+export default function ProductForm({ formData, handleChange, handleSubmit, change }) {
+  return (
+    <div className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
+      <section className="rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur">
+        <div className="flex items-center justify-between gap-4 border-b border-slate-100 pb-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-indigo-500">Products</p>
+            <h2 className="mt-2 text-2xl font-bold text-slate-900">{change}</h2>
+            <p className="mt-1 text-sm text-slate-500">Fill in the product details below.</p>
+          </div>
+          <div className="hidden rounded-2xl bg-indigo-50 px-4 py-3 text-sm font-semibold text-indigo-700 md:block">
+            Stock, price, category, SKU
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="mt-5 space-y-5">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field label="Product Name" required>
+              <input
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-indigo-300 focus:bg-white"
+                onChange={handleChange}
+                type="text"
+                value={formData.name}
+                name="name"
+                id="name"
+                placeholder="Enter product name"
+                required
+              />
+            </Field>
+
+            <Field label="Category" required>
+              <select
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-indigo-300 focus:bg-white"
+                id="category"
+                onChange={handleChange}
+                value={formData.category}
+                name="category"
+                required
+              >
+                <option value="" disabled>
+                  Select category
+                </option>
+                {categories.map((category) => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="Product Price" required>
+              <input
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-indigo-300 focus:bg-white"
+                onChange={handleChange}
+                type="number"
+                value={formData.price}
+                name="price"
+                placeholder="Enter selling price"
+                required
+              />
+            </Field>
+
+            <Field label="Cost Price">
+              <input
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-indigo-300 focus:bg-white"
+                onChange={handleChange}
+                type="number"
+                value={formData.costPrice}
+                name="costPrice"
+                id="costPrice"
+                placeholder="Enter cost price"
+              />
+            </Field>
+
+            <Field label="Product Stock" required>
+              <input
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-indigo-300 focus:bg-white"
+                onChange={handleChange}
+                type="number"
+                value={formData.stock}
+                name="stock"
+                id="stock"
+                placeholder="Enter stock quantity"
+                required
+              />
+            </Field>
+
+            <Field label="SKU">
+              <input
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-indigo-300 focus:bg-white"
+                onChange={handleChange}
+                type="text"
+                value={formData.sku}
+                name="sku"
+                id="sku"
+                placeholder="Optional SKU"
+              />
+            </Field>
+          </div>
+
+          <Field label="Product Description" hint="Add key features, usage details, and product notes.">
+            <textarea
+              className="min-h-32 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-indigo-300 focus:bg-white"
+              onChange={handleChange}
+              value={formData.description}
+              name="description"
+              placeholder="Enter product description"
+              id="description"
+            />
+          </Field>
+
+          <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-slate-500">Double-check stock and category before saving.</p>
+            <button
+              type="submit"
+              className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-200 transition hover:scale-[1.01] hover:from-indigo-500 hover:to-violet-500"
+            >
+              {change}
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <aside className="space-y-5">
+        <div className="rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur">
+          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-indigo-500">Tips</p>
+          <h3 className="mt-2 text-xl font-bold text-slate-900">Before you save</h3>
+          <ul className="mt-4 space-y-3 text-sm text-slate-600">
+            <li className="rounded-2xl bg-slate-50 px-4 py-3">Use a clear product name that matches your invoice records.</li>
+            <li className="rounded-2xl bg-slate-50 px-4 py-3">Keep SKU unique so search and edits stay fast later.</li>
+            <li className="rounded-2xl bg-slate-50 px-4 py-3">Set stock carefully to keep low-stock alerts accurate.</li>
+            <li className="rounded-2xl bg-slate-50 px-4 py-3">Choose the correct category for better filtering and reports.</li>
+          </ul>
+        </div>
+
+        <div className="rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur">
+          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-indigo-500">Preview</p>
+          <div className="mt-4 rounded-[24px] border border-dashed border-slate-200 bg-slate-50 p-5">
+            <div className="flex h-40 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-900 to-slate-700 text-white">
+              <div className="text-center">
+                <p className="text-sm text-slate-300">Product preview</p>
+                <p className="mt-1 text-lg font-semibold">{formData.name || "New Product"}</p>
+                <p className="mt-2 text-sm text-slate-300">{formData.category || "Category"}</p>
+              </div>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+              <div className="rounded-2xl bg-white p-3">
+                <p className="text-xs text-slate-500">Price</p>
+                <p className="mt-1 font-semibold text-slate-900">{formData.price || "0"}</p>
+              </div>
+              <div className="rounded-2xl bg-white p-3">
+                <p className="text-xs text-slate-500">Stock</p>
+                <p className="mt-1 font-semibold text-slate-900">{formData.stock || "0"}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  );
+}
+```
+
+File: D:\Web\SaaS\inventory-saas\src\app\globals.css
+```css
+@import "tailwindcss";
+
+:root {
+  --background: #eef2ff;
+  --foreground: #0f172a;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+.product-description{
+  border: 2px solid rgb(214, 206, 206);
+  border-radius: 5px;
+  padding: 5px;
+
+}
+.product-description button{
+  background-color: #c3bcbc;
+  border:2px ridge #928e8e;
+}
+.btn::after{
+  background-color: #c3bcbc;
+  border:2px ridge #928e8e;
+}
+```
+
+File: D:\Web\SaaS\inventory-saas\src\app\orders\page.jsx
+```jsx
+"use client";
+
+import {
+  MdChevronLeft,
+  MdChevronRight,
+  MdLocalShipping,
+  MdOutlineCancel,
+  MdOutlineDoneAll,
+  MdSearch,
+  MdShoppingCart,
+} from "react-icons/md";
+
+const orders = [
+  { id: "#ORD-001", customer: "Rahul Sharma", date: "May 30, 2026", amount: "Rs. 12,409", status: "Delivered" },
+  { id: "#ORD-002", customer: "Priya Singh", date: "May 29, 2026", amount: "Rs. 9,980", status: "Processing" },
+  { id: "#ORD-003", customer: "Amit Kumar", date: "May 28, 2026", amount: "Rs. 13,200", status: "Shipped" },
+  { id: "#ORD-004", customer: "Neha Patel", date: "May 27, 2026", amount: "Rs. 11,430", status: "Cancelled" },
+  { id: "#ORD-005", customer: "Karan Jha", date: "May 26, 2026", amount: "Rs. 9,110", status: "Delivered" },
+  { id: "#ORD-006", customer: "Sana Ali", date: "May 25, 2026", amount: "Rs. 8,820", status: "Processing" },
+];
+
+const statusStyles = {
+  Delivered: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100",
+  Processing: "bg-amber-50 text-amber-700 ring-1 ring-amber-100",
+  Shipped: "bg-sky-50 text-sky-700 ring-1 ring-sky-100",
+  Cancelled: "bg-rose-50 text-rose-700 ring-1 ring-rose-100",
+};
+
+function StatusBadge({ status }) {
+  return (
+    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[status]}`}>
+      {status}
+    </span>
+  );
+}
+
+function StatCard({ title, value, helper, icon: Icon, accent }) {
+  return (
+    <div className="rounded-3xl border border-white/70 bg-white/85 p-4 shadow-[0_16px_35px_rgba(15,23,42,0.08)] backdrop-blur">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium text-slate-500">{title}</p>
+          <p className="mt-2 text-2xl font-bold text-slate-900">{value}</p>
+          <p className="mt-1 text-xs text-slate-500">{helper}</p>
+        </div>
+        <div className={`rounded-2xl p-3 ${accent}`}>
+          <Icon className="text-2xl" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function OrdersPage() {
+  const stats = [
+    {
+      title: "Total Orders",
+      value: "126",
+      helper: "All orders this month",
+      icon: MdShoppingCart,
+      accent: "bg-indigo-50 text-indigo-600",
+    },
+    {
+      title: "Delivered",
+      value: "89",
+      helper: "Completed successfully",
+      icon: MdOutlineDoneAll,
+      accent: "bg-emerald-50 text-emerald-600",
+    },
+    {
+      title: "Processing",
+      value: "21",
+      helper: "Currently in progress",
+      icon: MdLocalShipping,
+      accent: "bg-sky-50 text-sky-600",
+    },
+    {
+      title: "Cancelled",
+      value: "7",
+      helper: "Needs review",
+      icon: MdOutlineCancel,
+      accent: "bg-rose-50 text-rose-600",
+    },
+  ];
+
+  return (
+    <div className="min-h-[calc(100vh-4rem)] bg-[radial-gradient(circle_at_top_left,_rgba(99,102,241,0.14),_transparent_30%),linear-gradient(180deg,#eff4ff_0%,#f8fbff_45%,#eef2ff_100%)] px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
+      <div className="mx-auto flex max-w-7xl flex-col gap-6">
+        <section className="rounded-[28px] border border-white/70 bg-white/80 px-5 py-5 shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-indigo-500">Orders</p>
+              <h1 className="mt-2 text-3xl font-bold text-slate-900">Orders Overview</h1>
+              <p className="mt-2 max-w-2xl text-sm text-slate-500">
+                Track incoming purchases, shipping progress, and order health in one dashboard view.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+              <MdSearch className="text-xl text-slate-400" />
+              <input
+                placeholder="Search orders..."
+                className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400 sm:w-64"
+              />
+            </div>
+          </div>
+        </section>
+
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {stats.map((stat) => (
+            <StatCard key={stat.title} {...stat} />
+          ))}
+        </section>
+
+        <section className="rounded-[28px] border border-white/70 bg-white/90 shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur">
+          <div className="flex items-center justify-between gap-4 border-b border-slate-100 px-5 py-4">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">Recent Orders</h2>
+              <p className="text-sm text-slate-500">Latest orders from your customers.</p>
+            </div>
+            <div className="hidden rounded-2xl bg-slate-50 px-3 py-2 text-sm text-slate-500 md:block">
+              Showing {orders.length} recent entries
+            </div>
+          </div>
+
+          <div className="hidden overflow-x-auto md:block">
+            <table className="min-w-full border-separate border-spacing-0">
+              <thead>
+                <tr className="text-left text-xs uppercase tracking-[0.18em] text-slate-400">
+                  <th className="px-5 py-4 font-semibold">Order</th>
+                  <th className="px-5 py-4 font-semibold">Customer</th>
+                  <th className="px-5 py-4 font-semibold">Date</th>
+                  <th className="px-5 py-4 font-semibold">Amount</th>
+                  <th className="px-5 py-4 font-semibold">Status</th>
+                  <th className="px-5 py-4 font-semibold text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {orders.map((order) => (
+                  <tr key={order.id} className="group border-t border-slate-100 transition hover:bg-slate-50/80">
+                    <td className="px-5 py-4 font-semibold text-slate-900">{order.id}</td>
+                    <td className="px-5 py-4 text-slate-700">{order.customer}</td>
+                    <td className="px-5 py-4 text-slate-700">{order.date}</td>
+                    <td className="px-5 py-4 font-semibold text-slate-900">{order.amount}</td>
+                    <td className="px-5 py-4">
+                      <StatusBadge status={order.status} />
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="flex justify-end gap-2">
+                        <button className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50">
+                          <MdChevronLeft className="text-lg" />
+                        </button>
+                        <button className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50">
+                          <MdChevronRight className="text-lg" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="grid gap-3 p-4 md:hidden">
+            {orders.map((order) => (
+              <article key={order.id} className="rounded-3xl border border-slate-100 bg-slate-50/80 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-slate-900">{order.id}</p>
+                    <p className="text-sm text-slate-500">{order.customer}</p>
+                  </div>
+                  <StatusBadge status={order.status} />
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                  <div className="rounded-2xl bg-white p-3">
+                    <p className="text-xs text-slate-500">Date</p>
+                    <p className="mt-1 font-medium text-slate-900">{order.date}</p>
+                  </div>
+                  <div className="rounded-2xl bg-white p-3">
+                    <p className="text-xs text-slate-500">Amount</p>
+                    <p className="mt-1 font-medium text-slate-900">{order.amount}</p>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+```
+
+File: D:\Web\SaaS\inventory-saas\src\app\products\page.jsx
+```jsx
+"use client";
+
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  MdAdd,
+  MdAttachMoney,
+  MdChevronLeft,
+  MdChevronRight,
+  MdDelete,
+  MdEdit,
+  MdFilterAlt,
+  MdInventory,
+  MdMoreHoriz,
+  MdSearch,
+  MdWarningAmber,
+} from "react-icons/md";
+import { fetchProducts } from "../components/productFetch";
+
+const money = new Intl.NumberFormat("en-IN", {
+  style: "currency",
+  currency: "INR",
+  maximumFractionDigits: 0,
+});
+
+const defaultPagination = {
+  page: 1,
+  limit: 10,
+  totalProducts: 0,
+  totalPages: 1,
+};
+
+function formatCurrency(value) {
+  return money.format(Number(value || 0));
+}
+
+function getStatus(stock) {
+  if (stock <= 0) {
+    return {
+      label: "Out of Stock",
+      className: "bg-rose-50 text-rose-600 ring-1 ring-rose-100",
+    };
+  }
+
+  if (stock <= 5) {
+    return {
+      label: "Low Stock",
+      className: "bg-amber-50 text-amber-700 ring-1 ring-amber-100",
+    };
+  }
+
+  return {
+    label: "In Stock",
+    className: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100",
+  };
+}
+
+function getPaginationItems(currentPage, totalPages) {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1);
+  }
+
+  const items = [1];
+  const start = Math.max(2, currentPage - 1);
+  const end = Math.min(totalPages - 1, currentPage + 1);
+
+  if (start > 2) items.push("...");
+
+  for (let page = start; page <= end; page += 1) {
+    items.push(page);
+  }
+
+  if (end < totalPages - 1) items.push("...");
+  items.push(totalPages);
+
+  return items;
+}
+
+function StatCard({ title, value, helper, icon, accent }) {
+  return (
+    <div className="rounded-3xl border border-white/70 bg-white/85 p-4 shadow-[0_16px_35px_rgba(15,23,42,0.08)] backdrop-blur">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium text-slate-500">{title}</p>
+          <p className="mt-2 text-2xl font-bold text-slate-900">{value}</p>
+          <p className="mt-1 text-xs text-slate-500">{helper}</p>
+        </div>
+        <div className={`rounded-2xl p-3 ${accent}`}>{icon}</div>
+      </div>
+    </div>
+  );
+}
+
+export default function ProductsPage() {
+  const router = useRouter();
+  const [products, setProducts] = useState([]);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [pagination, setPagination] = useState(defaultPagination);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadProducts() {
+      try {
+        setLoading(true);
+        setError("");
+        const data = await fetchProducts({ page, search });
+
+        if (!active) {
+          return;
+        }
+
+        setProducts(data.products ?? []);
+        setPagination(data.pagination ?? defaultPagination);
+      } catch (err) {
+        if (!active) {
+          return;
+        }
+
+        setError(err.message || "Failed to load products");
+        setProducts([]);
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadProducts();
+
+    return () => {
+      active = false;
+    };
+  }, [page, search]);
+
+  const stats = useMemo(() => {
+    const totalProducts = pagination.totalProducts ?? products.length;
+    const lowStock = products.filter((product) => product.stock > 0 && product.stock <= 5).length;
+    const outOfStock = products.filter((product) => product.stock <= 0).length;
+    const inventoryValue = products.reduce(
+      (sum, product) => sum + Number(product.price || 0) * Number(product.stock || 0),
+      0
+    );
+
+    return [
+      {
+        title: "Total Products",
+        value: totalProducts,
+        helper: "All products in your catalog",
+        icon: <MdInventory className="text-2xl text-indigo-600" />,
+        accent: "bg-indigo-50",
+      },
+      {
+        title: "Low Stock",
+        value: lowStock,
+        helper: "Needs attention soon",
+        icon: <MdWarningAmber className="text-2xl text-amber-600" />,
+        accent: "bg-amber-50",
+      },
+      {
+        title: "Out of Stock",
+        value: outOfStock,
+        helper: "Unavailable for sale",
+        icon: <MdMoreHoriz className="text-2xl text-rose-600" />,
+        accent: "bg-rose-50",
+      },
+      {
+        title: "Inventory Value",
+        value: formatCurrency(inventoryValue),
+        helper: "Current page estimate",
+        icon: <MdAttachMoney className="text-2xl text-emerald-600" />,
+        accent: "bg-emerald-50",
+      },
+    ];
+  }, [pagination.totalProducts, products]);
+
+  const visibleStart = pagination.totalProducts === 0 ? 0 : (page - 1) * pagination.limit + 1;
+  const visibleEnd = visibleStart + products.length - 1;
+  const paginationItems = getPaginationItems(page, pagination.totalPages || 1);
+
+  const handleDelete = async (id) => {
+    try {
+      const response = await fetch(`/api/product/${id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete product");
+      }
+
+      setProducts((prevProducts) => prevProducts.filter((product) => product._id !== id));
+
+      if (products.length === 1 && page > 1) {
+        setPage((currentPage) => currentPage - 1);
+      }
+    } catch (err) {
+      setError(err.message || "Error deleting product");
+    }
+  };
+
+  const handleSearchChange = (value) => {
+    setSearch(value);
+    setPage(1);
+  };
+
+  const handleFilterReset = () => {
+    setSearch("");
+    setPage(1);
+  };
+
+  return (
+    <div className="min-h-[calc(100vh-4rem)] bg-[radial-gradient(circle_at_top_left,_rgba(99,102,241,0.14),_transparent_30%),linear-gradient(180deg,#eff4ff_0%,#f8fbff_45%,#eef2ff_100%)] px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
+      <div className="mx-auto flex max-w-7xl flex-col gap-6">
+        <section className="rounded-[28px] border border-white/70 bg-white/80 px-5 py-5 shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-indigo-500">
+                Products
+              </p>
+              <h1 className="mt-2 text-3xl font-bold text-slate-900">Products List</h1>
+              <p className="mt-2 max-w-2xl text-sm text-slate-500">
+                Manage your products, stock levels, pricing, and availability from one clean view.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                <MdSearch className="text-xl text-slate-400" />
+                <input
+                  value={search}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  placeholder="Search products..."
+                  className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400 sm:w-64"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={handleFilterReset}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700"
+              >
+                <MdFilterAlt className="text-lg" />
+                Reset
+              </button>
+
+              <Link
+                href="/addProducts"
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-200 transition hover:scale-[1.01] hover:from-indigo-500 hover:to-violet-500"
+              >
+                <MdAdd className="text-lg" />
+                Add Product
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {stats.map((stat) => (
+            <StatCard key={stat.title} {...stat} />
+          ))}
+        </section>
+
+        {error ? (
+          <div className="rounded-3xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-700">
+            {error}
+          </div>
+        ) : null}
+
+        <section className="rounded-[28px] border border-white/70 bg-white/90 shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur">
+          <div className="flex items-center justify-between gap-4 border-b border-slate-100 px-5 py-4">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">All Products</h2>
+              <p className="text-sm text-slate-500">Manage catalog entries and stock status.</p>
+            </div>
+            <div className="hidden rounded-2xl bg-slate-50 px-3 py-2 text-sm text-slate-500 md:block">
+              {pagination.totalProducts > 0
+                ? `Showing ${visibleStart} to ${visibleEnd} of ${pagination.totalProducts} results`
+                : "No products found"}
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="space-y-3 p-5">
+              {Array.from({ length: 5 }, (_, index) => (
+                <div
+                  key={index}
+                  className="h-16 animate-pulse rounded-2xl bg-slate-100"
+                />
+              ))}
+            </div>
+          ) : products.length === 0 ? (
+            <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
+              <div className="rounded-3xl bg-indigo-50 p-4 text-indigo-600">
+                <MdInventory className="text-3xl" />
+              </div>
+              <h3 className="mt-4 text-xl font-semibold text-slate-900">No products yet</h3>
+              <p className="mt-2 max-w-md text-sm text-slate-500">
+                Try another search term or add your first product to start populating the list.
+              </p>
+              <Link
+                href="/addProducts"
+                className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-indigo-500"
+              >
+                <MdAdd className="text-lg" />
+                Add Product
+              </Link>
+            </div>
+          ) : (
+            <>
+              <div className="hidden overflow-x-auto md:block">
+                <table className="min-w-full border-separate border-spacing-0">
+                  <thead>
+                    <tr className="text-left text-xs uppercase tracking-[0.18em] text-slate-400">
+                      <th className="px-5 py-4 font-semibold">Product</th>
+                      <th className="px-5 py-4 font-semibold">Category</th>
+                      <th className="px-5 py-4 font-semibold">Price</th>
+                      <th className="px-5 py-4 font-semibold">Stock</th>
+                      <th className="px-5 py-4 font-semibold">Status</th>
+                      <th className="px-5 py-4 font-semibold text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {products.map((product) => {
+                      const status = getStatus(Number(product.stock || 0));
+
+                      return (
+                        <tr
+                          key={product._id}
+                          className="group border-t border-slate-100 transition hover:bg-slate-50/80"
+                        >
+                          <td className="px-5 py-4">
+                            <div className="flex items-center gap-4">
+                              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-900 to-slate-700 text-sm font-bold text-white">
+                                {(product.name || "P").charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <p className="font-semibold text-slate-900">{product.name}</p>
+                                <p className="mt-1 text-sm text-slate-500">SKU: {product.sku}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-5 py-4">
+                            <span className="inline-flex rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 ring-1 ring-indigo-100">
+                              {product.category || "Uncategorized"}
+                            </span>
+                          </td>
+                          <td className="px-5 py-4 text-sm font-semibold text-slate-900">
+                            {formatCurrency(product.price)}
+                          </td>
+                          <td className="px-5 py-4 text-sm text-slate-700">
+                            {Number(product.stock || 0)}
+                          </td>
+                          <td className="px-5 py-4">
+                            <span
+                              className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${status.className}`}
+                            >
+                              {status.label}
+                            </span>
+                          </td>
+                          <td className="px-5 py-4">
+                            <div className="flex justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => router.push(`/addProducts?id=${product._id}`)}
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-600"
+                                aria-label={`Edit ${product.name}`}
+                              >
+                                <MdEdit className="text-lg" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDelete(product._id)}
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-rose-200 bg-white text-rose-500 transition hover:bg-rose-50"
+                                aria-label={`Delete ${product.name}`}
+                              >
+                                <MdDelete className="text-lg" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="grid gap-3 p-4 md:hidden">
+                {products.map((product) => {
+                  const status = getStatus(Number(product.stock || 0));
+
+                  return (
+                    <article
+                      key={product._id}
+                      className="rounded-3xl border border-slate-100 bg-slate-50/80 p-4"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-900 text-sm font-bold text-white">
+                            {(product.name || "P").charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="font-semibold text-slate-900">{product.name}</p>
+                            <p className="text-xs text-slate-500">{product.sku}</p>
+                          </div>
+                        </div>
+                        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${status.className}`}>
+                          {status.label}
+                        </span>
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                        <div className="rounded-2xl bg-white p-3">
+                          <p className="text-xs text-slate-500">Category</p>
+                          <p className="mt-1 font-medium text-slate-900">{product.category || "Uncategorized"}</p>
+                        </div>
+                        <div className="rounded-2xl bg-white p-3">
+                          <p className="text-xs text-slate-500">Price</p>
+                          <p className="mt-1 font-medium text-slate-900">{formatCurrency(product.price)}</p>
+                        </div>
+                        <div className="rounded-2xl bg-white p-3">
+                          <p className="text-xs text-slate-500">Stock</p>
+                          <p className="mt-1 font-medium text-slate-900">{Number(product.stock || 0)}</p>
+                        </div>
+                        <div className="rounded-2xl bg-white p-3">
+                          <p className="text-xs text-slate-500">Cost Price</p>
+                          <p className="mt-1 font-medium text-slate-900">{formatCurrency(product.costPrice)}</p>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => router.push(`/addProducts?id=${product._id}`)}
+                          className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700"
+                        >
+                          <MdEdit />
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(product._id)}
+                          className="inline-flex items-center gap-2 rounded-2xl border border-rose-200 bg-white px-4 py-2 text-sm font-semibold text-rose-600"
+                        >
+                          <MdDelete />
+                          Delete
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+
+              <div className="flex flex-col gap-4 border-t border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-slate-500">
+                  {pagination.totalProducts > 0
+                    ? `Showing ${visibleStart} to ${visibleEnd} of ${pagination.totalProducts} results`
+                    : "No products found"}
+                </p>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPage((current) => Math.max(1, current - 1))}
+                    disabled={page <= 1}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <MdChevronLeft className="text-xl" />
+                  </button>
+
+                  {paginationItems.map((item, index) =>
+                    item === "..." ? (
+                      <span key={`ellipsis-${index}`} className="px-2 text-sm text-slate-400">
+                        ...
+                      </span>
+                    ) : (
+                      <button
+                        key={item}
+                        type="button"
+                        onClick={() => setPage(item)}
+                        className={`min-w-10 rounded-2xl px-3 py-2 text-sm font-semibold transition ${
+                          item === page
+                            ? "bg-indigo-600 text-white shadow-lg shadow-indigo-200"
+                            : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                        }`}
+                      >
+                        {item}
+                      </button>
+                    )
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setPage((current) => current + 1)}
+                    disabled={page >= pagination.totalPages}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <MdChevronRight className="text-xl" />
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </section>
+      </div>
+    </div>
+  );
+}
+```
+
+File: D:\Web\SaaS\inventory-saas\src\app\reports\page.jsx
+```jsx
+"use client";
+
+import {
+  MdDownload,
+  MdInsights,
+  MdInventory2,
+  MdPieChart,
+  MdSearch,
+  MdTrendingUp,
+} from "react-icons/md";
+
+const reportCards = [
+  { title: "Sales Revenue", value: "Rs. 52,430", change: "+12.8%", helper: "This month", icon: MdTrendingUp, accent: "bg-indigo-50 text-indigo-600" },
+  { title: "Orders", value: "89", change: "+8.3%", helper: "Compared to last month", icon: MdInsights, accent: "bg-sky-50 text-sky-600" },
+  { title: "Products Sold", value: "156", change: "+15.2%", helper: "Across all categories", icon: MdInventory2, accent: "bg-emerald-50 text-emerald-600" },
+  { title: "Category Growth", value: "4.6%", change: "+2.1%", helper: "Best performing groups", icon: MdPieChart, accent: "bg-amber-50 text-amber-600" },
+];
+
+const topReports = [
+  { name: "Sales Report", desc: "Revenue, refunds, and profit trends." },
+  { name: "Stock Report", desc: "Low stock alerts and replenishment needs." },
+  { name: "Order Report", desc: "Order volume, fulfillment, and cancellations." },
+  { name: "Category Report", desc: "Category-wise performance and growth." },
+];
+
+function StatCard({ title, value, change, helper, icon: Icon, accent }) {
+  return (
+    <div className="rounded-3xl border border-white/70 bg-white/85 p-4 shadow-[0_16px_35px_rgba(15,23,42,0.08)] backdrop-blur">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium text-slate-500">{title}</p>
+          <p className="mt-2 text-2xl font-bold text-slate-900">{value}</p>
+          <p className="mt-1 text-xs text-slate-500">{helper}</p>
+        </div>
+        <div className={`rounded-2xl p-3 ${accent}`}>
+          <Icon className="text-2xl" />
+        </div>
+      </div>
+      <div className="mt-4 text-sm font-semibold text-emerald-600">{change}</div>
+    </div>
+  );
+}
+
+function buildChartPath(values, width, height, padding) {
+  const max = Math.max(...values) * 1.15;
+  const min = Math.min(...values) * 0.85;
+  const innerWidth = width - padding * 2;
+  const innerHeight = height - padding * 2;
+
+  return values
+    .map((value, index) => {
+      const x = padding + (innerWidth / (values.length - 1)) * index;
+      const y = padding + ((max - value) / (max - min)) * innerHeight;
+      return `${index === 0 ? "M" : "L"} ${x} ${y}`;
+    })
+    .join(" ");
+}
+
+export default function ReportsPage() {
+  const series = [42, 48, 51, 58, 57, 66, 70, 68, 76, 74, 83, 82];
+  const width = 760;
+  const height = 320;
+  const padding = 30;
+  const path = buildChartPath(series, width, height, padding);
+
+  return (
+    <div className="min-h-[calc(100vh-4rem)] bg-[radial-gradient(circle_at_top_left,_rgba(99,102,241,0.14),_transparent_30%),linear-gradient(180deg,#eff4ff_0%,#f8fbff_45%,#eef2ff_100%)] px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
+      <div className="mx-auto flex max-w-7xl flex-col gap-6">
+        <section className="rounded-[28px] border border-white/70 bg-white/80 px-5 py-5 shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-indigo-500">Reports</p>
+              <h1 className="mt-2 text-3xl font-bold text-slate-900">Reports Dashboard</h1>
+              <p className="mt-2 max-w-2xl text-sm text-slate-500">
+                Review business performance, inventory movement, and sales trends from a single view.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+              <MdSearch className="text-xl text-slate-400" />
+              <input
+                placeholder="Search reports..."
+                className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400 sm:w-64"
+              />
+            </div>
+          </div>
+        </section>
+
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {reportCards.map((card) => (
+            <StatCard key={card.title} {...card} />
+          ))}
+        </section>
+
+        <section className="grid gap-5 xl:grid-cols-[1.6fr_1fr]">
+          <div className="rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">Revenue Trend</h2>
+                <p className="text-sm text-slate-500">Monthly line view of sales performance.</p>
+              </div>
+              <button className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm">
+                <MdDownload className="text-lg" />
+                Export
+              </button>
+            </div>
+
+            <div className="mt-5 rounded-3xl bg-gradient-to-b from-slate-50 to-white p-4">
+              <svg viewBox={`0 0 ${width} ${height}`} className="h-[320px] w-full">
+                {[0, 1, 2, 3].map((index) => {
+                  const y = padding + ((height - padding * 2) / 3) * index;
+                  return <line key={index} x1="0" y1={y} x2={width} y2={y} stroke="#e2e8f0" strokeDasharray="4 6" />;
+                })}
+                <path d={`${path} L ${width - padding} ${height - padding} L ${padding} ${height - padding} Z`} fill="rgba(99,102,241,0.12)" />
+                <path d={path} fill="none" stroke="#4f46e5" strokeWidth="4" strokeLinejoin="round" strokeLinecap="round" />
+              </svg>
+            </div>
+          </div>
+
+          <div className="rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur">
+            <h2 className="text-lg font-semibold text-slate-900">Popular Reports</h2>
+            <p className="text-sm text-slate-500">Quick access to the most used report types.</p>
+
+            <div className="mt-5 space-y-3">
+              {topReports.map((report) => (
+                <div key={report.name} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="font-semibold text-slate-900">{report.name}</p>
+                  <p className="mt-1 text-sm text-slate-500">{report.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+```
+
+File: D:\Web\SaaS\inventory-saas\src\app\settings\page.jsx
+```jsx
+"use client";
+
+import {
+  MdAccountCircle,
+  MdNotifications,
+  MdOutlineLock,
+  MdOutlineStore,
+  MdPalette,
+  MdSave,
+} from "react-icons/md";
+
+const sections = [
+  {
+    title: "Profile",
+    helper: "Update your account information",
+    icon: MdAccountCircle,
+    fields: ["Full Name", "Email Address", "Phone Number"],
+  },
+  {
+    title: "Store",
+    helper: "Manage your business details",
+    icon: MdOutlineStore,
+    fields: ["Store Name", "Store Email", "Store Address"],
+  },
+  {
+    title: "Security",
+    helper: "Password and authentication",
+    icon: MdOutlineLock,
+    fields: ["Current Password", "New Password", "Confirm Password"],
+  },
+  {
+    title: "Notifications",
+    helper: "Control what you hear about",
+    icon: MdNotifications,
+    fields: ["Low stock alerts", "Order updates", "Weekly summary"],
+  },
+];
+
+function SectionCard({ title, helper, icon: Icon, fields }) {
+  return (
+    <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
+      <div className="flex items-start gap-3">
+        <div className="rounded-2xl bg-indigo-50 p-3 text-indigo-600">
+          <Icon className="text-2xl" />
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
+          <p className="mt-1 text-sm text-slate-500">{helper}</p>
+        </div>
+      </div>
+
+      <div className="mt-5 space-y-3">
+        {fields.map((field) => (
+          <div key={field}>
+            <label className="mb-2 block text-sm font-medium text-slate-700">{field}</label>
+            <input
+              placeholder={`Enter ${field.toLowerCase()}`}
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-indigo-300 focus:bg-white"
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <div className="min-h-[calc(100vh-4rem)] bg-[radial-gradient(circle_at_top_left,_rgba(99,102,241,0.14),_transparent_30%),linear-gradient(180deg,#eff4ff_0%,#f8fbff_45%,#eef2ff_100%)] px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
+      <div className="mx-auto flex max-w-7xl flex-col gap-6">
+        <section className="rounded-[28px] border border-white/70 bg-white/80 px-5 py-5 shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-indigo-500">Settings</p>
+              <h1 className="mt-2 text-3xl font-bold text-slate-900">Account Settings</h1>
+              <p className="mt-2 max-w-2xl text-sm text-slate-500">
+                Personalize your store, secure your account, and manage notifications from one place.
+              </p>
+            </div>
+
+            <div className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm">
+              <MdPalette className="text-lg text-indigo-600" />
+              Light dashboard theme
+            </div>
+          </div>
+        </section>
+
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-3xl border border-white/70 bg-white/85 p-4 shadow-[0_16px_35px_rgba(15,23,42,0.08)] backdrop-blur">
+            <p className="text-sm font-medium text-slate-500">Profile Completeness</p>
+            <p className="mt-2 text-2xl font-bold text-slate-900">92%</p>
+            <p className="mt-1 text-xs text-slate-500">Almost ready</p>
+          </div>
+          <div className="rounded-3xl border border-white/70 bg-white/85 p-4 shadow-[0_16px_35px_rgba(15,23,42,0.08)] backdrop-blur">
+            <p className="text-sm font-medium text-slate-500">Store Status</p>
+            <p className="mt-2 text-2xl font-bold text-slate-900">Active</p>
+            <p className="mt-1 text-xs text-slate-500">Visible to team</p>
+          </div>
+          <div className="rounded-3xl border border-white/70 bg-white/85 p-4 shadow-[0_16px_35px_rgba(15,23,42,0.08)] backdrop-blur">
+            <p className="text-sm font-medium text-slate-500">Notifications</p>
+            <p className="mt-2 text-2xl font-bold text-slate-900">On</p>
+            <p className="mt-1 text-xs text-slate-500">Low stock enabled</p>
+          </div>
+          <div className="rounded-3xl border border-white/70 bg-white/85 p-4 shadow-[0_16px_35px_rgba(15,23,42,0.08)] backdrop-blur">
+            <p className="text-sm font-medium text-slate-500">Security</p>
+            <p className="mt-2 text-2xl font-bold text-slate-900">2FA</p>
+            <p className="mt-1 text-xs text-slate-500">Recommended</p>
+          </div>
+        </section>
+
+        <section className="grid gap-5 xl:grid-cols-2">
+          {sections.map((section) => (
+            <SectionCard key={section.title} {...section} />
+          ))}
+        </section>
+
+        <section className="rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">Store Preferences</h2>
+              <p className="text-sm text-slate-500">Fine tune your workspace behavior.</p>
+            </div>
+            <button className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-500">
+              <MdSave className="text-lg" />
+              Save Changes
+            </button>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+```
+
+File: D:\Web\SaaS\inventory-saas\src\app\suppliers\page.jsx
+```jsx
+"use client";
+
+import { MdLocalShipping, MdMailOutline, MdPhone, MdSearch, MdStar } from "react-icons/md";
+
+const suppliers = [
+  { name: "Tech World Distributors", contact: "+91 98765 43210", email: "sales@techworld.com", products: 25, rating: 4.9, status: "Active" },
+  { name: "Global Electronics Co.", contact: "+91 98123 45678", email: "orders@globalelec.com", products: 18, rating: 4.7, status: "Active" },
+  { name: "Office Furnish Hub", contact: "+91 98987 65432", email: "support@officefurnish.com", products: 12, rating: 4.5, status: "Pending" },
+  { name: "AccessPoint Supplies", contact: "+91 90000 11223", email: "hello@accesspoint.com", products: 30, rating: 4.8, status: "Active" },
+];
+
+function StatCard({ title, value, helper, icon: Icon, accent }) {
+  return (
+    <div className="rounded-3xl border border-white/70 bg-white/85 p-4 shadow-[0_16px_35px_rgba(15,23,42,0.08)] backdrop-blur">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium text-slate-500">{title}</p>
+          <p className="mt-2 text-2xl font-bold text-slate-900">{value}</p>
+          <p className="mt-1 text-xs text-slate-500">{helper}</p>
+        </div>
+        <div className={`rounded-2xl p-3 ${accent}`}>
+          <Icon className="text-2xl" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function SuppliersPage() {
+  const stats = [
+    { title: "Suppliers", value: "24", helper: "Active partners", icon: MdLocalShipping, accent: "bg-indigo-50 text-indigo-600" },
+    { title: "Avg Rating", value: "4.8", helper: "Across vendor list", icon: MdStar, accent: "bg-amber-50 text-amber-600" },
+    { title: "Pending Review", value: "3", helper: "Awaiting approval", icon: MdMailOutline, accent: "bg-sky-50 text-sky-600" },
+    { title: "Purchase Orders", value: "61", helper: "Linked to suppliers", icon: MdPhone, accent: "bg-emerald-50 text-emerald-600" },
+  ];
+
+  return (
+    <div className="min-h-[calc(100vh-4rem)] bg-[radial-gradient(circle_at_top_left,_rgba(99,102,241,0.14),_transparent_30%),linear-gradient(180deg,#eff4ff_0%,#f8fbff_45%,#eef2ff_100%)] px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
+      <div className="mx-auto flex max-w-7xl flex-col gap-6">
+        <section className="rounded-[28px] border border-white/70 bg-white/80 px-5 py-5 shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-indigo-500">Suppliers</p>
+              <h1 className="mt-2 text-3xl font-bold text-slate-900">Supplier Directory</h1>
+              <p className="mt-2 max-w-2xl text-sm text-slate-500">
+                Keep track of vendor contacts, fulfillment strength, and sourcing reliability.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+              <MdSearch className="text-xl text-slate-400" />
+              <input
+                placeholder="Search suppliers..."
+                className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400 sm:w-64"
+              />
+            </div>
+          </div>
+        </section>
+
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {stats.map((stat) => (
+            <StatCard key={stat.title} {...stat} />
+          ))}
+        </section>
+
+        <section className="rounded-[28px] border border-white/70 bg-white/90 shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur">
+          <div className="flex items-center justify-between gap-4 border-b border-slate-100 px-5 py-4">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">Suppliers List</h2>
+              <p className="text-sm text-slate-500">Vendors and sourcing partners.</p>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="min-w-full border-separate border-spacing-0">
+              <thead>
+                <tr className="text-left text-xs uppercase tracking-[0.18em] text-slate-400">
+                  <th className="px-5 py-4 font-semibold">Supplier</th>
+                  <th className="px-5 py-4 font-semibold">Contact</th>
+                  <th className="px-5 py-4 font-semibold">Products</th>
+                  <th className="px-5 py-4 font-semibold">Rating</th>
+                  <th className="px-5 py-4 font-semibold">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {suppliers.map((supplier) => (
+                  <tr key={supplier.name} className="border-t border-slate-100 transition hover:bg-slate-50/80">
+                    <td className="px-5 py-4">
+                      <p className="font-semibold text-slate-900">{supplier.name}</p>
+                      <p className="mt-1 text-sm text-slate-500">{supplier.email}</p>
+                    </td>
+                    <td className="px-5 py-4 text-sm text-slate-700">{supplier.contact}</td>
+                    <td className="px-5 py-4 text-sm text-slate-700">{supplier.products}</td>
+                    <td className="px-5 py-4 text-sm font-semibold text-slate-900">{supplier.rating}</td>
+                    <td className="px-5 py-4">
+                      <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${supplier.status === "Active" ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100" : "bg-amber-50 text-amber-700 ring-1 ring-amber-100"}`}>
+                        {supplier.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+```

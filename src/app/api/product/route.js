@@ -1,52 +1,37 @@
-import { NextResponse } from "next/server";
-import dbConnect from "@/app/lib/db";
-import Product from "@/app/models/productSchema"; // IMPORTANT
+// API route for listing and creating products.
+import { failure, normalizeError, success } from "@/app/lib/response";
+import { assertAuth, parsePagination, parseJsonBody } from "@/app/lib/apiHelpers";
+import { createProduct, listProducts } from "@/app/services/productService";
+import { productSchema } from "@/app/lib/validation";
 
-// POST /api/product
-// Creates a new product record in MongoDB using the request body
 export async function POST(request) {
-  await dbConnect();
-
-  // Parse the JSON payload sent from the client form
-  const data = await request.json();
-
-  // Save the product document into the collection
-
-  try{
-  const product = await Product.create(data);
-  
-  return NextResponse.json({
-    message: "Product added successfully",
-    product,
-  });
-
-  } catch(error){
-    return NextResponse.json(
-      {error :error.message},
-      {status:400}
-    );
-  }
-
-}
-
-// GET /api/product
-// Returns all saved products from the database
-export async function GET() {
   try {
-    await dbConnect();
-
-    // Fetch every product document in the collection
-    const products = await Product.find(); // FIXED
-
-    return NextResponse.json({
-      message: "Products fetched successfully",
-      products,
+    const auth = await assertAuth(request);
+    const data = await parseJsonBody(request);
+    const payload = productSchema.parse({
+      ...data,
+      userId: auth.userId,
+      barcodes: data.barcodes?.length
+        ? data.barcodes.map((item) => ({ code: item.code, state: item.state || "AVAILABLE" }))
+        : undefined,
     });
+
+    const product = await createProduct(auth.userId, payload);
+    return success("Product added successfully", { product });
   } catch (error) {
-    return NextResponse.json(
-      { message: "Error fetching products", error: error.message },
-      { status: 500 }
-    );
+    const normalized = normalizeError(error);
+    return failure(normalized.message, normalized.errors, normalized.status);
   }
 }
 
+export async function GET(request) {
+  try {
+    const auth = await assertAuth(request);
+    const { page, limit, search } = parsePagination(request);
+    const data = await listProducts(auth.userId, { page, limit, search });
+    return success("Products fetched successfully", data);
+  } catch (error) {
+    const normalized = normalizeError(error);
+    return failure(normalized.message, normalized.errors, normalized.status);
+  }
+}

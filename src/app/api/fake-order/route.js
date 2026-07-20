@@ -1,3 +1,4 @@
+// Test helper route that creates a sample order payload.
 export async function POST() {
   const fakeOrder = {
     orderId: "ORD_" + Math.floor(Math.random() * 10000),
@@ -17,6 +18,7 @@ export async function POST() {
 
   return Response.json({
     success: true,
+    message: "Fake order generated successfully",
     order: fakeOrder
   });
 }

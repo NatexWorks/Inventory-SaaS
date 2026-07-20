@@ -1,12 +1,7 @@
 import mongoose from "mongoose";
 
-const MONGODB_URI = process.env.MONGODB_URI;
-if (!MONGODB_URI) {
-  // Fail fast if the database connection string is missing
-  throw new Error("Please define the MONGODB_URI environment variable");
-}
+const MONGODB_URI = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/inventory-saas";
 
-// Reuse a cached connection during hot reloads and serverless invocations
 let cached = global.mongoose;
 
 if (!cached) {
@@ -14,27 +9,16 @@ if (!cached) {
 }
 
 async function dbConnect() {
-    // Return the existing connection if it already exists
-    if (cached.conn) {
-        return cached.conn;
-    }
-    // Create a single shared connection promise if one does not exist yet
-    if (!cached.promise) {
-       
-        cached.promise = mongoose.connect(MONGODB_URI).then((mongoose) => {
-            return mongoose;
-        });
-    }
-    cached.conn = await cached.promise;
+  if (cached.conn) {
     return cached.conn;
-  } 
-export default dbConnect;
+  }
 
-// Optional helper for manually disconnecting from MongoDB
-// export async function dbDisconnect() {
-//   if (cached.conn) {
-//     await mongoose.disconnect();
-//     cached.conn = null;
-//     cached.promise = null;
-//   }
-// }
+  if (!cached.promise) {
+    cached.promise = mongoose.connect(MONGODB_URI).then((mongooseInstance) => mongooseInstance);
+  }
+
+  cached.conn = await cached.promise;
+  return cached.conn;
+}
+
+export default dbConnect;

@@ -1,26 +1,92 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import Sidebar from "./Sidebar";
 import Navbar from "./Navbar";
 
 export default function ClientLayout({ children }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  // `open` controls whether the sidebar is visible on desktop and mobile.
   const [open, setOpen] = useState(true);
-const handleClick = () => {
-    setOpen(prev => !prev);
-    console.log("Menu icon clicked");
+  // `user` is fetched from the session endpoint and passed to the chrome UI.
+  const [user, setUser] = useState(null);
+
+  // Auth routes render without the app shell so login pages stay clean.
+  const isAuthRoute = ["/login", "/signup", "/forgot-password", "/reset-password"].includes(pathname)
+    || pathname.startsWith("/forgot-password/")
+    || pathname.startsWith("/reset-password/");
+
+  // Simple toggle handler for the sidebar drawer.
+  const handleClick = () => {
+    setOpen((prev) => !prev);
   };
+
+  // On protected routes, load the current user and redirect to login if missing.
+  useEffect(() => {
+    if (isAuthRoute) {
+      return;
+    }
+
+    let active = true;
+
+    async function loadUser() {
+      try {
+        const response = await fetch("/api/auth/me", {
+          credentials: "include",
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          throw new Error("Unauthorized");
+        }
+
+        const payload = await response.json();
+        if (active) {
+          setUser(payload?.data?.user || null);
+        }
+      } catch {
+        if (active) {
+          router.replace("/login");
+        }
+      }
+    }
+
+    loadUser();
+
+    return () => {
+      active = false;
+    };
+  }, [isAuthRoute, router]);
+
+  if (isAuthRoute) {
+    return <>{children}</>;
+  }
+
   return (
-    <div className="flex min-h-screen">
-      {/* Sidebar */}
-      <Sidebar className="fixed top-0 left-0 z-3" open={open} handleClick={handleClick} />
+    <div className="flex min-h-screen bg-[#eef2ff]">
+      <Sidebar className="fixed top-0 left-0 z-30" open={open} handleClick={handleClick} user={user} />
 
-      {/* Right side content */}
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* Navbar */}
-        <Navbar className="relative top-0 left-0 z-1" handleClick={handleClick} />
+        {!open ? (
+          <button
+            type="button"
+            onClick={handleClick}
+            className="fixed left-4 top-4 z-40 inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-lg shadow-slate-200/70 transition hover:border-indigo-200 hover:text-indigo-600"
+            aria-label="Open sidebar"
+          >
+            <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 6h16" />
+              <path d="M4 12h16" />
+              <path d="M4 18h16" />
+            </svg>
+          </button>
+        ) : null}
 
-        <main className="flex-1 p-4">
+        <Navbar className="relative top-0 left-0 z-10" handleClick={handleClick} user={user} />
+
+        <main className="min-w-0 flex-1">
           {children}
         </main>
       </div>

@@ -1,41 +1,112 @@
 "use client";
 import {
+  MdArrowDropDown,
+  MdSearch,
+  MdLogout,
   MdMenu,
   MdNotifications,
   MdMessage,
   MdAccountCircle
 } from "react-icons/md";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { signOut } from "next-auth/react";
 
-export default function Navbar({ handleClick ,className}) {
+export default function Navbar({ handleClick, className = "", user }) {
+  const router = useRouter();
+  // Search is kept in local state because the navbar only needs the current text.
+  const [search, setSearch] = useState("");
+  // Prevents duplicate logout clicks while the API request is in flight.
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  const displayName = user?.name || "Inventory User";
+  const displayEmail = user?.email || "Syncing account...";
+
+  function handleSearchSubmit(event) {
+    event.preventDefault();
+    const query = search.trim();
+    router.push(query ? `/products?search=${encodeURIComponent(query)}` : "/products");
+  }
+
+  // Ends the NextAuth session and then sends the user back to login.
+  async function handleLogout() {
+    try {
+      setLoggingOut(true);
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      });
+      await signOut({ callbackUrl: "/login" });
+    } finally {
+      setLoggingOut(false);
+    }
+  }
+  
   return (
     <>
-      <nav className={`bg-zinc-100 flex justify-between items-center p-4 px-10 w-full border-b border-gray-200 ${className}`}>
-        {/* Logo and welcome message */}
-        <div>
-            <span className="flex items-center gap-4">
-        <MdMenu size={38} onClick={handleClick} className="text-3xl cursor-pointer mx-2.5" />
+      <nav className={`flex items-center justify-between border-b border-slate-200 bg-white/95 px-4 py-4 shadow-[0_1px_0_rgba(15,23,42,0.03)] backdrop-blur sm:px-6 lg:px-8 ${className}`}>
+        <div className="min-w-0">
+          <span className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleClick}
+              className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 transition hover:border-indigo-200 hover:text-indigo-600 lg:hidden"
+              aria-label="Toggle sidebar"
+            >
+              <MdMenu size={24} />
+            </button>
 
-        <div className=" font-bold">welcome Back user!</div></span>
-        <p className="text-sm text-gray-400">Hey what&apos;s happening with your store today</p>
+            <div className="min-w-0">
+              <div className="truncate text-sm font-semibold text-slate-500">Welcome back</div>
+              <div className="truncate text-lg font-bold text-slate-900">{displayName}</div>
+            </div>
+          </span>
+          <p className="mt-1 text-sm text-slate-500">Live store activity, inventory movement, and alerts.</p>
         </div>
-         {/* input search bar */}
-         {/* right contaainer contains search and right side icons */}
-         <div className="rightcontainer flex gap-4 justify-between">
-         <div className="flex gap-4 items-center hover:bg-gray-200 transition-colors duration-300 rounded-lg px-2 py-1">
-         <input type="text" placeholder="Search..." className="px-4 py-2 rounded-lg text-gray-700 bg-white placeholder:text-sm border-2 border-gray-200 placeholder:text-gray-400    " />
-         </div>
-          {/* Logout button */}
-            <div className="flex bg-zinc-100 border-2 border-gray-300 p-2 rounded-lg items-center">
-              <MdNotifications size={25} className="text-3xl cursor-pointer mx-2.5" />
-              <MdMessage size={25} className="text-3xl cursor-pointer mx-2.5" />
-              <MdAccountCircle size={25} className="text-3xl cursor-pointer mx-2.5" />
+
+        <div className="flex items-center gap-3">
+          <form onSubmit={handleSearchSubmit} className="hidden items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 xl:flex">
+            <MdSearch className="text-xl text-slate-400" />
+            <input
+              type="text"
+              value={search}
+              placeholder="Search products..."
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-64 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
+            />
+          </form>
+
+          <div className="flex items-center gap-1 rounded-2xl border border-slate-200 bg-white p-1">
+            <button type="button" className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 transition hover:bg-slate-100 hover:text-slate-900" aria-label="Notifications">
+              <MdNotifications size={22} />
+            </button>
+            <button type="button" className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 transition hover:bg-slate-100 hover:text-slate-900" aria-label="Messages">
+              <MdMessage size={22} />
+            </button>
+          </div>
+
+          <div className="hidden items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 md:flex">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-600 text-white">
+              <MdAccountCircle size={26} />
             </div>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-slate-900">{displayName}</p>
+              <p className="truncate text-xs text-slate-500">{displayEmail}</p>
             </div>
-           
+            <MdArrowDropDown className="text-xl text-slate-400" />
+          </div>
+
+          <button
+            type="button"
+            onClick={handleLogout}
+            disabled={loggingOut}
+            className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
+          >
+            <MdLogout className="text-lg" />
+            {loggingOut ? "Signing out..." : "Logout"}
+          </button>
+        </div>
       </nav>
-      {/* <h1 className="text-2xl font-bold">Navbar</h1> */}
-    
     </>
   );
 }
-

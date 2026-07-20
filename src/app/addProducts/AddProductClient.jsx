@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import ProductForm from "../components/productForm";
+import { fetchCategories } from "../components/productFetch";
 
 export default function AddProductClient({ id }) {
-  const [image, setImage] = useState(null);
   const [Form, setFormData] = useState({
     name: "",
     price: "",
@@ -13,7 +13,62 @@ export default function AddProductClient({ id }) {
     category: "",
     sku: "",
     description: "",
+    manualBarcodes: "",
   });
+  const [barcodeMode, setBarcodeMode] = useState("optional");
+  const [categories, setCategories] = useState([]);
+  const [loadingCategories, setLoadingCategories] = useState(true);
+  const [loadingSettings, setLoadingSettings] = useState(true);
+  const [categoryError, setCategoryError] = useState("");
+  const [barcodeNotice, setBarcodeNotice] = useState("");
+  const [existingBarcodeCount, setExistingBarcodeCount] = useState(0);
+
+  function appendBarcode(code) {
+    const normalizedCode = String(code || "").trim();
+    if (!normalizedCode) {
+      return;
+    }
+
+    setFormData((current) => {
+      const existing = String(current.manualBarcodes || "")
+        .split(/[\n,]/)
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+      if (existing.includes(normalizedCode)) {
+        setBarcodeNotice(`Barcode ${normalizedCode} already exists in the list.`);
+        return current;
+      }
+
+      const nextValue = current.manualBarcodes ? `${current.manualBarcodes.trimEnd()}\n${normalizedCode}` : normalizedCode;
+      setBarcodeNotice(`Barcode ${normalizedCode} added.`);
+      return {
+        ...current,
+        manualBarcodes: nextValue,
+      };
+    });
+  }
+
+  function removeBarcode(codeToRemove) {
+    const normalizedCode = String(codeToRemove || "").trim();
+    if (!normalizedCode) {
+      return;
+    }
+
+    setBarcodeNotice(`Barcode ${normalizedCode} removed.`);
+    setFormData((current) => {
+      const nextBarcodes = String(current.manualBarcodes || "")
+        .split(/[\n,]/)
+        .map((item) => item.trim())
+        .filter(Boolean)
+        .filter((item) => item !== normalizedCode);
+
+      return {
+        ...current,
+        manualBarcodes: nextBarcodes.join("\n"),
+      };
+    });
+  }
 
   // handleChange function to update form state on input change
   const handleChange = (e) => {
@@ -28,6 +83,20 @@ export default function AddProductClient({ id }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
+    const manualBarcodes = Array.from(
+      new Set(
+        String(formData.get("manualBarcodes") || "")
+          .split(/[\n,]/)
+          .map((code) => code.trim())
+          .filter(Boolean)
+      )
+    );
+
+    if (barcodeMode === "strict" && manualBarcodes.length === 0) {
+      setBarcodeNotice("Barcode is required in strict barcode mode.");
+      return;
+    }
+
     // Build a plain object so it can be sent as JSON to the API
     const data = {
       name: formData.get("name"),
@@ -37,33 +106,29 @@ export default function AddProductClient({ id }) {
       category: formData.get("category"),
       sku: formData.get("sku"),
       description: formData.get("description"),
+      barcodes: manualBarcodes.map((code) => ({ code, state: "AVAILABLE" })),
     };
-    //  formData.append("image", image);
-    console.log(data);
     // Send the product data to the backend API
 
-    setFormData({
-      name: "",
-      price: "",
-      stock: "",
-      costPrice: "",
-      category: "",
-      sku: "",
-      description: "",
-    });
+    setBarcodeNotice("");
     await createProducts(data);
   };
 
   // Calls the API route that stores a new product in MongoDB
   async function createProducts(data) {
     try {
+      const payload = {
+        ...data,
+      };
+
       if (id) {
         await fetch(`/api/product/${id}`, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(data),
+          credentials: "include",
+          body: JSON.stringify(payload),
         });
       } else {
         await fetch("/api/product", {
@@ -71,7 +136,8 @@ export default function AddProductClient({ id }) {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(data),
+          credentials: "include",
+          body: JSON.stringify(payload),
         });
       }
     } catch (error) {
@@ -81,27 +147,167 @@ export default function AddProductClient({ id }) {
 
   // edit
   useEffect(() => {
+    let active = true;
+
     async function loadProduct() {
       if (!id) return;
 
-      const res = await fetch(`/api/product/${id}`);
+      const res = await fetch(`/api/product/${id}`, {
+        credentials: "include",
+        cache: "no-store",
+      });
       const data = await res.json();
-      console.log("Fetched product data:", data);
-      console.log("Setting form data with:", data.product);
-      setFormData(data.product);
+      if (!active) return;
+      const existingBarcodes = Array.isArray(data?.product?.barcodes) ? data.product.barcodes : [];
+      setFormData({
+        name: data?.product?.name || "",
+        price: data?.product?.price ?? "",
+        stock: data?.product?.stock ?? "",
+        costPrice: data?.product?.costPrice ?? "",
+        category: data?.product?.category || "",
+        sku: data?.product?.sku || "",
+        description: data?.product?.description || "",
+        manualBarcodes: existingBarcodes.map((item) => item?.code).filter(Boolean).join("\n"),
+      });
+      setExistingBarcodeCount(existingBarcodes.length);
     }
 
     loadProduct();
+    return () => {
+      active = false;
+    };
   }, [id]);
 
+  useEffect(() => {
+    let active = true;
+
+    async function loadSettings() {
+      try {
+        setLoadingSettings(true);
+        const response = await fetch("/api/settings", {
+          credentials: "include",
+          cache: "no-store",
+        });
+        const payload = await response.json();
+
+        if (!response.ok) {
+          throw new Error(payload?.message || "Failed to load settings");
+        }
+
+        if (!active) {
+          return;
+        }
+
+        setBarcodeMode(payload?.data?.settings?.inventory?.barcodeMode || "optional");
+      } catch {
+        if (active) {
+          setBarcodeMode("optional");
+        }
+      } finally {
+        if (active) {
+          setLoadingSettings(false);
+        }
+      }
+    }
+
+    loadSettings();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadCategories() {
+      try {
+        setLoadingCategories(true);
+        setCategoryError("");
+        const data = await fetchCategories();
+        if (!active) return;
+        setCategories(data.categories || []);
+      } catch (error) {
+        if (active) {
+          setCategoryError(error.message || "Failed to load categories");
+          setCategories([]);
+        }
+      } finally {
+        if (active) {
+          setLoadingCategories(false);
+        }
+      }
+    }
+
+    loadCategories();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   return (
-    <div className="container">
-      <ProductForm
-        formData={Form}
-        handleChange={handleChange}
-        handleSubmit={handleSubmit}
-        change={id ? "Edit Product" : "Add Product"}
-      />
+    <div className="min-h-[calc(100vh-4rem)] bg-[radial-gradient(circle_at_top_left,_rgba(99,102,241,0.14),_transparent_30%),linear-gradient(180deg,#eff4ff_0%,#f8fbff_45%,#eef2ff_100%)] px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
+      <div className="mx-auto flex max-w-7xl flex-col gap-6">
+        <section className="rounded-[28px] border border-white/70 bg-white/80 px-5 py-5 shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-indigo-500">Products</p>
+              <h1 className="mt-2 text-3xl font-bold text-slate-900">{id ? "Edit Product" : "Add New Product"}</h1>
+              <p className="mt-2 max-w-2xl text-sm text-slate-500">
+                Create a new catalog item or update an existing one with pricing, stock, and category details.
+              </p>
+            </div>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Mode</p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">{id ? "Editing" : "Creating"}</p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Fields</p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">Name, price, stock</p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Status</p>
+                <p className="mt-1 text-sm font-semibold text-emerald-600">Ready to save</p>
+              </div>
+              {id ? (
+                <div className="rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-3 sm:col-span-3 xl:col-span-1">
+                  <p className="text-xs font-medium uppercase tracking-wide text-indigo-400">Existing barcodes</p>
+                  <p className="mt-1 text-sm font-semibold text-indigo-700">{existingBarcodeCount}</p>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </section>
+
+        <ProductForm
+          formData={Form}
+          handleChange={handleChange}
+          handleSubmit={handleSubmit}
+          change={id ? "Edit Product" : "Add Product"}
+          categories={categories}
+          onBarcodeScan={appendBarcode}
+          onBarcodeRemove={removeBarcode}
+          barcodeNotice={barcodeNotice}
+          barcodeRequired={barcodeMode === "strict"}
+          barcodeMode={barcodeMode}
+        />
+        {loadingSettings ? (
+          <div className="rounded-3xl border border-slate-200 bg-white/80 px-5 py-4 text-sm text-slate-500">
+            Loading barcode settings...
+          </div>
+        ) : null}
+        {categoryError ? (
+          <div className="rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-700">
+            {categoryError}
+          </div>
+        ) : loadingCategories ? (
+          <div className="rounded-3xl border border-slate-200 bg-white/80 px-5 py-4 text-sm text-slate-500">
+            Loading categories for the product form...
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }

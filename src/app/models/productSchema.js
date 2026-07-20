@@ -1,21 +1,35 @@
+// Product schema stores catalog items, stock, and barcode references.
 import mongoose from "mongoose";
 
 const { Schema } = mongoose;
 
-// Defines the shape of a product document in MongoDB
-const inventorySchema = new Schema({
-  name: String,
-  price: Number,
-  costPrice: Number,
-  sku: String,
-  stock: Number,
-  category: String,
-  description: String,
-}, {
-  timestamps: true
-});
-// Model name: Product
-// Collection name: product
+const productSchema = new Schema(
+  {
+    userId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
+    categoryId: { type: Schema.Types.ObjectId, ref: "Category", default: null, index: true },
+    category: { type: String, required: true, trim: true, default: "Uncategorized", index: true },
+    name: { type: String, required: true, trim: true, index: true },
+    price: { type: Number, required: true, min: 0 },
+    costPrice: { type: Number, default: 0, min: 0 },
+    stock: { type: Number, required: true, min: 0, default: 0 },
+    sku: { type: String, trim: true, default: "", index: true },
+    description: { type: String, default: "" },
+    barcodeMode: { type: String, enum: ["UNIT", "PRODUCT"], default: "PRODUCT" },
+    barcodes: [
+      {
+        code: { type: String, trim: true },
+        state: { type: String, enum: ["AVAILABLE", "RESERVED", "SOLD", "RETURNED"], default: "AVAILABLE" },
+        barcodeId: { type: Schema.Types.ObjectId, ref: "Barcode", default: null },
+      },
+    ],
+    isActive: { type: Boolean, default: true },
+  },
+  { timestamps: true }
+);
 
-const Product = mongoose.models.Product || mongoose.model("Product", inventorySchema, "product");
+productSchema.index({ userId: 1, sku: 1 }, { unique: true, sparse: true });
+productSchema.index({ userId: 1, name: 1 });
+productSchema.index({ userId: 1, category: 1 });
+
+const Product = mongoose.models.Product || mongoose.model("Product", productSchema, "products");
 export default Product;
