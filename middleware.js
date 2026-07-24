@@ -1,27 +1,45 @@
 import { NextResponse } from "next/server";
-import { getToken } from "next-auth/jwt";
+import { readTokenFromRequest, verifyToken } from "@/app/lib/security";
 
-const AUTH_PATHS = ["/login", "/signup", "/forgot-password", "/reset-password"];
-const AUTH_SECRET = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "dev-inventory-secret-change-me";
+const AUTH_PATHS = [
+  "/login",
+  "/signup",
+  "/forgot-password",
+  "/reset-password",
+];
 
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
-  const token = await getToken({ req: request, secret: AUTH_SECRET });
-  const authed = Boolean(token?.sub);
 
+  // Read custom JWT cookie
+  const token = readTokenFromRequest(request);
+
+  // Verify JWT
+  const payload = token ? verifyToken(token) : null;
+  const authed = Boolean(payload?.sub);
+
+  // Protect API routes
   if (pathname.startsWith("/api")) {
     if (pathname.startsWith("/api/auth")) {
       return NextResponse.next();
     }
 
     if (!authed) {
-      return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+      return NextResponse.json(
+        { success: false, message: "Unauthorized" },
+        { status: 401 }
+      );
     }
 
     return NextResponse.next();
   }
 
-  if (AUTH_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))) {
+  // Redirect authenticated users away from auth pages
+  if (
+    AUTH_PATHS.some(
+      (path) => pathname === path || pathname.startsWith(`${path}/`)
+    )
+  ) {
     if (authed) {
       return NextResponse.redirect(new URL("/", request.url));
     }
@@ -29,6 +47,7 @@ export async function middleware(request) {
     return NextResponse.next();
   }
 
+  // Protect all other pages
   if (!authed) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("next", pathname);
@@ -39,5 +58,8 @@ export async function middleware(request) {
 }
 
 export const config = {
-  matcher: ["/api/:path*", "/((?!_next/static|_next/image|favicon.ico|.*\\.).*)"],
+  matcher: [
+    "/api/:path*",
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.).*)",
+  ],
 };
