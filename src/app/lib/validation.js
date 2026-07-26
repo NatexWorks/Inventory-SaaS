@@ -46,7 +46,17 @@ export const productSchema = z.object({
   categoryId: objectId.optional().nullable(),
   category: z.string().trim().min(2).max(120).optional().default("Uncategorized"),
   description: z.string().trim().max(2000).optional().default(""),
-  sku: z.string().trim().max(80).optional().nullable(),
+  sku: z.preprocess(
+    (value) => {
+      if (typeof value === "string") {
+        const trimmed = value.trim();
+        return trimmed ? trimmed : undefined;
+      }
+
+      return value;
+    },
+    z.string().trim().max(80).optional().nullable()
+  ),
   userId: objectId.optional(),
   barcodes: z.array(z.object({
     code: z.string().trim().min(1),

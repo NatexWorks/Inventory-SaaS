@@ -12,7 +12,7 @@ const productSchema = new Schema(
     price: { type: Number, required: true, min: 0 },
     costPrice: { type: Number, default: 0, min: 0 },
     stock: { type: Number, required: true, min: 0, default: 0 },
-    sku: { type: String, trim: true, default: "", index: true },
+    sku: { type: String, trim: true, index: true },
     description: { type: String, default: "" },
     barcodeMode: { type: String, enum: ["UNIT", "PRODUCT"], default: "PRODUCT" },
     barcodes: [

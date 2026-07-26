@@ -69,6 +69,10 @@ const orderDateTimeFormatter = new Intl.DateTimeFormat("en-IN", {
   timeZone: INDIA_TIME_ZONE,
 });
 
+function getCartItemKey(item) {
+  return item?.barcode ? `barcode:${item.barcode}` : `product:${item.productId}`;
+}
+
 // Restores the draft cart from localStorage when the page opens.
 function loadDraftCart() {
   if (typeof window === "undefined") {
@@ -184,12 +188,22 @@ export default function OrdersPage() {
     setOrders(data?.data?.orders || []);
   }
 
+  async function refreshProducts() {
+    const response = await fetch("/api/product?limit=100");
+    if (!response.ok) {
+      throw new Error("Failed to load products");
+    }
+
+    const data = await response.json();
+    setProducts(data?.data?.products || []);
+  }
+
   function getAvailableStock(productId) {
     const product = products.find((item) => String(item._id) === String(productId));
     return Math.max(0, Number(product?.stock ?? 0));
   }
 
-  function upsertCartItem(product, quantityDelta = 1) {
+  function upsertCartItem(product, quantityDelta = 1, barcodeInfo = null) {
     // Adds a new item or increases quantity for an existing cart line.
     const availableStock = Math.max(0, Number(product?.stock ?? getAvailableStock(product._id)));
     if (availableStock <= 0) {
@@ -197,10 +211,25 @@ export default function OrdersPage() {
       return false;
     }
 
+    const barcodeValue = String(barcodeInfo?.code || "").trim();
+    const barcodeIdValue = barcodeInfo?.barcodeId || barcodeInfo?._id || null;
+
     setCart((current) => {
-      const existingIndex = current.findIndex((item) => item.productId === product._id);
+      const existingIndex = current.findIndex((item) => {
+        if (barcodeValue) {
+          return item.barcode === barcodeValue;
+        }
+
+        return item.productId === product._id && !item.barcode;
+      });
+
       if (existingIndex >= 0) {
         const existingItem = current[existingIndex];
+        if (barcodeValue) {
+          setDraftMessage(`${product.name} barcode ${barcodeValue} is already in the cart.`);
+          return current;
+        }
+
         const currentQuantity = Math.max(1, Number(existingItem.quantity || 1));
         const nextQuantity = currentQuantity + Number(quantityDelta || 1);
 
@@ -240,6 +269,8 @@ export default function OrdersPage() {
           stock: availableStock,
           quantity: initialQuantity,
           lineTotal: Number(product.price || 0) * initialQuantity,
+          barcode: barcodeValue,
+          barcodeId: barcodeIdValue,
         },
       ];
     });
@@ -247,9 +278,9 @@ export default function OrdersPage() {
     return true;
   }
 
-  function upsertFromBarcodeCode(product, code, messageSuffix = "added to the cart") {
+  function upsertFromBarcodeCode(product, code, messageSuffix = "added to the cart", barcodeInfo = null) {
     // Shared helper for camera scans, manual scans, and cache fallback.
-    const added = upsertCartItem(product);
+    const added = upsertCartItem(product, 1, barcodeInfo);
     if (added) {
       setBarcode("");
       setDraftMessage(`${product.name} ${messageSuffix}`);
@@ -288,14 +319,24 @@ export default function OrdersPage() {
         if (!fallbackProduct) {
           throw new Error(data?.message || "Barcode not found");
         }
-        upsertFromBarcodeCode(fallbackProduct, normalizedCode, source === "camera" ? "added from camera cache" : "added from offline cache");
+        upsertFromBarcodeCode(
+          fallbackProduct,
+          normalizedCode,
+          source === "camera" ? "added from camera cache" : "added from offline cache",
+          { code: normalizedCode }
+        );
         return;
       }
 
-      upsertFromBarcodeCode(data.data.product, normalizedCode);
+      upsertFromBarcodeCode(data.data.product, normalizedCode, "added to the cart", data.data.barcode);
     } catch (err) {
       if (fallbackProduct) {
-        upsertFromBarcodeCode(fallbackProduct, normalizedCode, source === "camera" ? "added from camera cache" : "added from offline cache");
+        upsertFromBarcodeCode(
+          fallbackProduct,
+          normalizedCode,
+          source === "camera" ? "added from camera cache" : "added from offline cache",
+          { code: normalizedCode }
+        );
         return;
       }
 
@@ -325,6 +366,8 @@ export default function OrdersPage() {
           customerName: "Walk-in Customer",
           items: cart.map((item) => ({
             productId: item.productId,
+            barcodeId: item.barcodeId || null,
+            barcode: item.barcode || "",
             name: item.name,
             quantity: item.quantity,
             price: item.price,
@@ -345,6 +388,7 @@ export default function OrdersPage() {
       window.localStorage.removeItem(DRAFT_KEY);
       setDraftMessage(`Order ${data?.data?.order?.orderNumber || "saved"} is waiting for owner approval.`);
       await refreshOrders();
+      await refreshProducts();
     } catch (err) {
       setDraftMessage(err.message || "Checkout failed");
     }
@@ -383,8 +427,8 @@ export default function OrdersPage() {
     );
   }
 
-  function removeFromCart(productId) {
-    setCart((current) => current.filter((item) => item.productId !== productId));
+  function removeFromCart(itemKey) {
+    setCart((current) => current.filter((item) => getCartItemKey(item) !== itemKey));
   }
 
   async function handleApprove(orderId) {
@@ -397,6 +441,7 @@ export default function OrdersPage() {
         throw new Error(data?.message || "Approval failed");
       }
       await refreshOrders();
+      await refreshProducts();
       setActionMessage(data?.message || "Order approved and stock updated");
     } catch (err) {
       setActionMessage(err.message || "Approval failed");
@@ -413,6 +458,7 @@ export default function OrdersPage() {
         throw new Error(data?.message || "Cancellation failed");
       }
       await refreshOrders();
+      await refreshProducts();
       setActionMessage(data?.message || "Order cancelled");
     } catch (err) {
       setActionMessage(err.message || "Cancellation failed");
@@ -429,6 +475,7 @@ export default function OrdersPage() {
         throw new Error(data?.message || "Soft delete failed");
       }
       await refreshOrders();
+      await refreshProducts();
       setActionMessage(data?.message || "Order moved to soft delete");
     } catch (err) {
       setActionMessage(err.message || "Soft delete failed");
@@ -605,25 +652,32 @@ export default function OrdersPage() {
                     </div>
                   ) : (
                     cart.map((item) => (
-                      <div key={item.productId} className="rounded-2xl border border-slate-200 bg-white p-3">
+                      <div key={getCartItemKey(item)} className="rounded-2xl border border-slate-200 bg-white p-3">
                         <div className="flex items-start justify-between gap-3">
                           <div>
                             <p className="font-semibold text-slate-900">{item.name}</p>
+                            {item.barcode ? <p className="mt-1 text-xs text-slate-400">Barcode: {item.barcode}</p> : null}
                             <p className="mt-1 text-sm text-slate-500">{formatCurrency(item.price)} each</p>
                           </div>
-                          <button onClick={() => removeFromCart(item.productId)} className="rounded-full p-2 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600">
+                          <button
+                            onClick={() => removeFromCart(getCartItemKey(item))}
+                            className="rounded-full p-2 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
+                          >
                             <MdDelete />
                           </button>
                         </div>
                         <div className="mt-3 flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-2 rounded-full bg-slate-50 p-1">
-                            <button
-                              onClick={() => updateCartQuantity(item.productId, item.quantity - 1)}
-                              className="rounded-full px-3 py-1 text-slate-500 transition hover:bg-white"
-                            >
-                              <MdChevronLeft />
-                            </button>
-                            <span className="min-w-10 text-center text-sm font-semibold text-slate-900">{item.quantity}</span>
+                          {item.barcode ? (
+                            <span className="rounded-full bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">Qty 1</span>
+                          ) : (
+                            <div className="flex items-center gap-2 rounded-full bg-slate-50 p-1">
+                              <button
+                                onClick={() => updateCartQuantity(item.productId, item.quantity - 1)}
+                                className="rounded-full px-3 py-1 text-slate-500 transition hover:bg-white"
+                              >
+                                <MdChevronLeft />
+                              </button>
+                              <span className="min-w-10 text-center text-sm font-semibold text-slate-900">{item.quantity}</span>
                               <button
                                 onClick={() => updateCartQuantity(item.productId, item.quantity + 1)}
                                 disabled={Number(item.quantity || 1) >= getAvailableStock(item.productId)}
@@ -637,6 +691,7 @@ export default function OrdersPage() {
                                 <MdChevronRight />
                               </button>
                             </div>
+                          )}
                           <p className="text-sm font-semibold text-slate-900">{formatCurrency(item.lineTotal)}</p>
                         </div>
                       </div>

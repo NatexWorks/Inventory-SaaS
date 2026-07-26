@@ -101,6 +101,15 @@ function StatCard({ title, value, helper, icon, accent }) {
   );
 }
 
+function buildBarcodeDrafts(product) {
+  const stockCount = Math.max(0, Number(product?.stock || 0));
+  const existingCodes = Array.isArray(product?.barcodes)
+    ? product.barcodes.map((item) => String(item?.code || "").trim()).filter(Boolean)
+    : [];
+
+  return Array.from({ length: stockCount }, (_, index) => existingCodes[index] || "");
+}
+
 export default function ProductsPage() {
   // This screen manages search, pagination, and delete actions for products.
   const router = useRouter();
@@ -115,6 +124,10 @@ export default function ProductsPage() {
   const [barcodeScannerStatus, setBarcodeScannerStatus] = useState("Camera scanner ready");
   const [barcodeScanning, setBarcodeScanning] = useState(false);
   const [barcodeInput, setBarcodeInput] = useState("");
+  const [barcodeEditorTarget, setBarcodeEditorTarget] = useState(null);
+  const [barcodeDrafts, setBarcodeDrafts] = useState([]);
+  const [barcodeEditorError, setBarcodeEditorError] = useState("");
+  const [barcodeEditorSaving, setBarcodeEditorSaving] = useState(false);
 
   // Keep the search state aligned with the URL so navbar searches land here cleanly.
   useEffect(() => {
@@ -261,6 +274,86 @@ export default function ProductsPage() {
     setBarcodeScanning(false);
     setBarcodeInput("");
   };
+
+  const closeBarcodeEditor = () => {
+    setBarcodeEditorTarget(null);
+    setBarcodeDrafts([]);
+    setBarcodeEditorError("");
+    setBarcodeEditorSaving(false);
+  };
+
+  const openBarcodeEditor = (product) => {
+    setBarcodeEditorTarget(product);
+    setBarcodeDrafts(buildBarcodeDrafts(product));
+    setBarcodeEditorError("");
+    setBarcodeEditorSaving(false);
+  };
+
+  const updateBarcodeDraft = (index, value) => {
+    setBarcodeDrafts((current) => current.map((entry, entryIndex) => (entryIndex === index ? value : entry)));
+  };
+
+  async function saveBarcodeAssignments() {
+    if (!barcodeEditorTarget) {
+      return;
+    }
+
+    const stockCount = Math.max(0, Number(barcodeEditorTarget.stock || 0));
+    const normalizedBarcodes = [];
+    const seen = new Set();
+
+    for (const entry of barcodeDrafts) {
+      const code = String(entry || "").trim();
+      if (!code) {
+        continue;
+      }
+
+      if (seen.has(code)) {
+        setBarcodeEditorError(`Barcode ${code} is entered more than once.`);
+        return;
+      }
+
+      seen.add(code);
+      normalizedBarcodes.push({ code, state: "AVAILABLE" });
+    }
+
+    if (stockCount > 0 && normalizedBarcodes.length > stockCount) {
+      setBarcodeEditorError("Barcode count cannot be greater than stock quantity.");
+      return;
+    }
+
+    try {
+      setBarcodeEditorSaving(true);
+      setBarcodeEditorError("");
+
+      const response = await fetch(`/api/product/${barcodeEditorTarget._id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          barcodes: normalizedBarcodes,
+        }),
+      });
+
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload?.message || "Failed to save barcodes");
+      }
+
+      const updatedProduct = payload?.data?.product;
+      if (updatedProduct) {
+        setProducts((current) =>
+          current.map((product) => (String(product._id) === String(updatedProduct._id) ? updatedProduct : product))
+        );
+      }
+
+      closeBarcodeEditor();
+    } catch (err) {
+      setBarcodeEditorError(err.message || "Failed to save barcodes");
+    } finally {
+      setBarcodeEditorSaving(false);
+    }
+  }
 
   async function handleProductBarcodeScan(code) {
     if (!barcodeTarget) {
@@ -467,6 +560,14 @@ export default function ProductsPage() {
                             <div className="flex justify-end gap-2">
                               <button
                                 type="button"
+                                onClick={() => openBarcodeEditor(product)}
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-emerald-200 bg-white text-emerald-600 transition hover:bg-emerald-50"
+                                aria-label={`Add barcodes for ${product.name}`}
+                              >
+                                <MdAdd className="text-lg" />
+                              </button>
+                              <button
+                                type="button"
                                 onClick={() => openBarcodeScanner(product)}
                                 className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-indigo-200 bg-white text-indigo-600 transition hover:bg-indigo-50"
                                 aria-label={`Scan barcode for ${product.name}`}
@@ -545,6 +646,14 @@ export default function ProductsPage() {
                       </div>
 
                       <div className="mt-4 flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openBarcodeEditor(product)}
+                          className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-600"
+                        >
+                          <MdAdd />
+                          Barcodes
+                        </button>
                         <button
                           type="button"
                           onClick={() => openBarcodeScanner(product)}
@@ -707,6 +816,86 @@ export default function ProductsPage() {
                     )}
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {barcodeEditorTarget ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4 py-6 backdrop-blur-sm">
+          <div className="w-full max-w-3xl overflow-hidden rounded-[28px] border border-white/20 bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-emerald-500">Add Barcodes</p>
+                <h3 className="mt-2 text-xl font-bold text-slate-900">{barcodeEditorTarget.name}</h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Stock {Number(barcodeEditorTarget.stock || 0)} | Existing barcodes {Array.isArray(barcodeEditorTarget.barcodes) ? barcodeEditorTarget.barcodes.length : 0}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeBarcodeEditor}
+                className="rounded-full border border-slate-200 bg-white p-2 text-slate-500 transition hover:bg-slate-50"
+                aria-label="Close barcode editor"
+              >
+                <MdClose className="text-lg" />
+              </button>
+            </div>
+
+            <div className="p-5">
+              <div className="rounded-3xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                Optional: fill any barcode slots you want to assign. Leave the rest blank if you do not want to save barcodes now.
+              </div>
+
+              {barcodeDrafts.length > 0 ? (
+                <div className="mt-4 max-h-[55vh] space-y-3 overflow-auto pr-1">
+                  {barcodeDrafts.map((draft, index) => (
+                    <div
+                      key={`barcode-draft-${index}`}
+                      className="grid gap-3 rounded-3xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-[120px_minmax(0,1fr)] md:items-center"
+                    >
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Slot {index + 1}</p>
+                        <p className="mt-1 text-sm text-slate-500">For stock item {index + 1}</p>
+                      </div>
+                      <input
+                        value={draft}
+                        onChange={(event) => updateBarcodeDraft(index, event.target.value)}
+                        placeholder={`Barcode ${index + 1}`}
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-emerald-300"
+                      />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-4 rounded-3xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+                  This product has 0 stock, so there are no barcode slots to fill right now.
+                </div>
+              )}
+
+              {barcodeEditorError ? (
+                <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                  {barcodeEditorError}
+                </div>
+              ) : null}
+
+              <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end">
+                <button
+                  type="button"
+                  onClick={closeBarcodeEditor}
+                  className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={saveBarcodeAssignments}
+                  disabled={barcodeEditorSaving}
+                  className="inline-flex items-center justify-center rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {barcodeEditorSaving ? "Saving..." : "Save"}
+                </button>
               </div>
             </div>
           </div>

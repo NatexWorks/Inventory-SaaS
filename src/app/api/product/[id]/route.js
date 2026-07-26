@@ -22,7 +22,7 @@ export async function PUT(request, { params }) {
     const { id } = await params;
     const data = await parseJsonBody(request);
 
-    const payload = productSchema.parse({
+    const payload = productSchema.partial().parse({
       ...data,
       userId: auth.userId,
       barcodes: data.barcodes?.length

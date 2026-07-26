@@ -15,13 +15,12 @@ export default function AddProductClient({ id }) {
     description: "",
     manualBarcodes: "",
   });
-  const [barcodeMode, setBarcodeMode] = useState("optional");
   const [categories, setCategories] = useState([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
-  const [loadingSettings, setLoadingSettings] = useState(true);
   const [categoryError, setCategoryError] = useState("");
   const [barcodeNotice, setBarcodeNotice] = useState("");
   const [existingBarcodeCount, setExistingBarcodeCount] = useState(0);
+  const [submitError, setSubmitError] = useState("");
 
   function appendBarcode(code) {
     const normalizedCode = String(code || "").trim();
@@ -92,11 +91,6 @@ export default function AddProductClient({ id }) {
       )
     );
 
-    if (barcodeMode === "strict" && manualBarcodes.length === 0) {
-      setBarcodeNotice("Barcode is required in strict barcode mode.");
-      return;
-    }
-
     // Build a plain object so it can be sent as JSON to the API
     const data = {
       name: formData.get("name"),
@@ -110,6 +104,7 @@ export default function AddProductClient({ id }) {
     };
     // Send the product data to the backend API
 
+    setSubmitError("");
     setBarcodeNotice("");
     await createProducts(data);
   };
@@ -122,7 +117,7 @@ export default function AddProductClient({ id }) {
       };
 
       if (id) {
-        await fetch(`/api/product/${id}`, {
+        const response = await fetch(`/api/product/${id}`, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
@@ -130,8 +125,12 @@ export default function AddProductClient({ id }) {
           credentials: "include",
           body: JSON.stringify(payload),
         });
+        const responsePayload = await response.json();
+        if (!response.ok) {
+          throw new Error(responsePayload?.message || "Failed to update product");
+        }
       } else {
-        await fetch("/api/product", {
+        const response = await fetch("/api/product", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -139,8 +138,13 @@ export default function AddProductClient({ id }) {
           credentials: "include",
           body: JSON.stringify(payload),
         });
+        const responsePayload = await response.json();
+        if (!response.ok) {
+          throw new Error(responsePayload?.message || "Failed to add product");
+        }
       }
     } catch (error) {
+      setSubmitError(error.message || "Something went wrong");
       console.error(error);
     }
   }
@@ -177,44 +181,6 @@ export default function AddProductClient({ id }) {
       active = false;
     };
   }, [id]);
-
-  useEffect(() => {
-    let active = true;
-
-    async function loadSettings() {
-      try {
-        setLoadingSettings(true);
-        const response = await fetch("/api/settings", {
-          credentials: "include",
-          cache: "no-store",
-        });
-        const payload = await response.json();
-
-        if (!response.ok) {
-          throw new Error(payload?.message || "Failed to load settings");
-        }
-
-        if (!active) {
-          return;
-        }
-
-        setBarcodeMode(payload?.data?.settings?.inventory?.barcodeMode || "optional");
-      } catch {
-        if (active) {
-          setBarcodeMode("optional");
-        }
-      } finally {
-        if (active) {
-          setLoadingSettings(false);
-        }
-      }
-    }
-
-    loadSettings();
-    return () => {
-      active = false;
-    };
-  }, []);
 
   useEffect(() => {
     let active = true;
@@ -290,17 +256,16 @@ export default function AddProductClient({ id }) {
           onBarcodeScan={appendBarcode}
           onBarcodeRemove={removeBarcode}
           barcodeNotice={barcodeNotice}
-          barcodeRequired={barcodeMode === "strict"}
-          barcodeMode={barcodeMode}
+          barcodeRequired={false}
+          barcodeMode="optional"
         />
-        {loadingSettings ? (
-          <div className="rounded-3xl border border-slate-200 bg-white/80 px-5 py-4 text-sm text-slate-500">
-            Loading barcode settings...
-          </div>
-        ) : null}
         {categoryError ? (
           <div className="rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-700">
             {categoryError}
+          </div>
+        ) : submitError ? (
+          <div className="rounded-3xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-700">
+            {submitError}
           </div>
         ) : loadingCategories ? (
           <div className="rounded-3xl border border-slate-200 bg-white/80 px-5 py-4 text-sm text-slate-500">

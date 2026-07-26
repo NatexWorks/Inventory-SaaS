@@ -92,15 +92,9 @@ async function syncBarcodes(userId, productId, barcodes = [], { autoGenerate = f
   return resolved;
 }
 
-async function assertBarcodePolicy(userId, barcodes = []) {
+async function assertBarcodePolicy(userId) {
   const settings = await getSettings(userId);
-  const barcodeMode = settings?.inventory?.barcodeMode || "optional";
-
-  if (barcodeMode === "strict" && (!Array.isArray(barcodes) || barcodes.length === 0)) {
-    throw new Error("At least one barcode is required in strict barcode mode");
-  }
-
-  return barcodeMode;
+  return settings?.inventory?.barcodeMode || "optional";
 }
 
 export async function listProducts(userId, { page = 1, limit = 10, search = "" } = {}) {
@@ -150,6 +144,7 @@ export async function createProduct(userId, input) {
   const category = payload.categoryId
     ? null
     : await upsertCategoryFromName(userId, payload.category);
+  const sku = payload.sku?.trim() || undefined;
 
   const product = await Product.create({
     userId,
@@ -159,7 +154,7 @@ export async function createProduct(userId, input) {
     price: payload.price,
     costPrice: payload.costPrice || 0,
     stock: payload.stock,
-    sku: payload.sku || "",
+    ...(sku ? { sku } : {}),
     description: payload.description || "",
     barcodes: payload.barcodes || [],
   });
@@ -194,6 +189,14 @@ export async function updateProduct(userId, id, input) {
   }
 
   const update = { ...payload };
+  if (Object.prototype.hasOwnProperty.call(payload, "sku")) {
+    const sku = payload.sku?.trim() || undefined;
+    if (sku) {
+      update.sku = sku;
+    } else {
+      delete update.sku;
+    }
+  }
   if (payload.category && !payload.categoryId) {
     const category = await upsertCategoryFromName(userId, payload.category);
     update.categoryId = category?._id || null;
