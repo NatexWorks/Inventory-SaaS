@@ -1,22 +1,13 @@
 import { NextResponse } from "next/server";
-import { readTokenFromRequest, verifyToken } from "@/app/lib/security";
+import { getToken } from "next-auth/jwt";
 
-const AUTH_PATHS = [
-  "/login",
-  "/signup",
-  "/forgot-password",
-  "/reset-password",
-];
+const AUTH_PATHS = ["/login", "/signup", "/forgot-password", "/reset-password"];
+const AUTH_SECRET = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "dev-inventory-secret-change-me";
 
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
-
-  // Read custom JWT cookie
-  const token = readTokenFromRequest(request);
-
-  // Verify JWT
-  const payload = token ? verifyToken(token) : null;
-  const authed = Boolean(payload?.sub);
+  const token = await getToken({ req: request, secret: AUTH_SECRET });
+  const authed = Boolean(token?.sub);
 
   // Protect API routes
   if (pathname.startsWith("/api")) {

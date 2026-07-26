@@ -2,15 +2,17 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { MdArrowForward, MdLockOutline, MdPersonOutline } from "react-icons/md";
 
 // Shared input styling so both login and signup screens stay visually consistent.
 const baseField =
   "w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-indigo-300 focus:bg-white";
 
-export default function AuthForm({ mode = "login", nextPath = "/" }) {
+export default function AuthForm({ mode = "login", redirectPath = "/" }) {
   // `mode` decides whether this form behaves like login or signup.
   const isSignup = mode === "signup";
+  const router = useRouter();
 
   // `useState` stores form values and request status inside the component.
   const [form, setForm] = useState({
@@ -73,7 +75,8 @@ export default function AuthForm({ mode = "login", nextPath = "/" }) {
         setMessage(payload?.message || "Login successful");
       }
 
-      window.location.href = nextPath;
+      router.replace(redirectPath);
+      router.refresh();
     } catch (err) {
       setError(err.message || "Something went wrong");
     } finally {

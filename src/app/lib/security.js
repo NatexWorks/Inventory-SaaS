@@ -1,7 +1,6 @@
 // Authentication helpers for password hashing, JWTs, and auth cookies.
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
-import { getToken } from "next-auth/jwt";
 import { cookies } from "next/headers";
 import { AUTH_COOKIE_NAME } from "./authConstants";
 
@@ -64,18 +63,10 @@ export function applyAuthCookie(response, token) {
   return response;
 }
 
-// Extracts the authenticated user payload from either the NextAuth JWT or the legacy cookie during migration.
+// Extracts the authenticated user payload from the app's own signed cookie.
 export async function getAuthenticatedUser(request) {
-  let payload = await getToken({
-    req: request,
-    secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || getJwtSecret(),
-  });
-
-  // Keep the legacy JWT cookie working during the auth migration window.
-  if (!payload?.sub) {
-    const legacyToken = readTokenFromRequest(request);
-    payload = legacyToken ? verifyToken(legacyToken) : null;
-  }
+  const legacyToken = readTokenFromRequest(request);
+  const payload = legacyToken ? verifyToken(legacyToken) : null;
 
   if (!payload?.sub) {
     return null;

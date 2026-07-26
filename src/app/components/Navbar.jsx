@@ -10,7 +10,6 @@ import {
 } from "react-icons/md";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { signOut } from "next-auth/react";
 
 export default function Navbar({ handleClick, className = "", user }) {
   const router = useRouter();
@@ -28,7 +27,7 @@ export default function Navbar({ handleClick, className = "", user }) {
     router.push(query ? `/products?search=${encodeURIComponent(query)}` : "/products");
   }
 
-  // Ends the NextAuth session and then sends the user back to login.
+  // Ends the custom auth session and then sends the user back to login.
   async function handleLogout() {
     try {
       setLoggingOut(true);
@@ -36,7 +35,8 @@ export default function Navbar({ handleClick, className = "", user }) {
         method: "POST",
         credentials: "include",
       });
-      await signOut({ callbackUrl: "/login" });
+      router.replace("/login");
+      router.refresh();
     } finally {
       setLoggingOut(false);
     }
