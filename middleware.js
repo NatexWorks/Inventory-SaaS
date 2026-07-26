@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server";
-import { getToken } from "next-auth/jwt";
+import { AUTH_COOKIE_NAME } from "./src/app/lib/authConstants";
 
 const AUTH_PATHS = ["/login", "/signup", "/forgot-password", "/reset-password"];
-const AUTH_SECRET = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "dev-inventory-secret-change-me";
 
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
-  const token = await getToken({ req: request, secret: AUTH_SECRET });
-  const authed = Boolean(token?.sub);
+  const token = request.cookies.get(AUTH_COOKIE_NAME)?.value;
+  const authed = Boolean(token);
 
   // Protect API routes
   if (pathname.startsWith("/api")) {
