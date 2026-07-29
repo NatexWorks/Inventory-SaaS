@@ -45,7 +45,7 @@ export default function Navbar({ handleClick, className = "", user }) {
   return (
     <>
       <nav className={`flex items-center justify-between border-b border-slate-200 bg-white/95 px-4 py-4 shadow-[0_1px_0_rgba(15,23,42,0.03)] backdrop-blur sm:px-6 lg:px-8 ${className}`}>
-        <div className="min-w-0">
+        <div className="min-w-0 max-w-full">
           <span className="flex items-center gap-3">
             <button
               type="button"
@@ -56,23 +56,23 @@ export default function Navbar({ handleClick, className = "", user }) {
               <MdMenu size={24} />
             </button>
 
-            <div className="min-w-0">
-              <div className="truncate text-sm font-semibold text-slate-500">Welcome back</div>
-              <div className="truncate text-lg font-bold text-slate-900">{displayName}</div>
+            <div className="min-w-0 max-w-full">
+              <div className="wrap-safe text-sm font-semibold leading-tight text-slate-500">Welcome back</div>
+              <div className="wrap-safe text-lg font-bold leading-tight text-slate-900 sm:truncate sm:whitespace-nowrap">{displayName}</div>
             </div>
           </span>
           <p className="mt-1 text-sm text-slate-500">Live store activity, inventory movement, and alerts.</p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <form onSubmit={handleSearchSubmit} className="hidden items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 xl:flex">
+          <div className="flex items-center gap-3">
+          <form onSubmit={handleSearchSubmit} className="hidden min-w-0 items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 xl:flex">
             <MdSearch className="text-xl text-slate-400" />
             <input
               type="text"
               value={search}
               placeholder="Search products..."
               onChange={(e) => setSearch(e.target.value)}
-              className="w-64 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
+              className="min-w-0 w-64 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
             />
           </form>
 
@@ -85,13 +85,13 @@ export default function Navbar({ handleClick, className = "", user }) {
             </button>
           </div>
 
-          <div className="hidden items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 md:flex">
+          <div className="hidden max-w-[16rem] items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 md:flex">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-600 text-white">
               <MdAccountCircle size={26} />
             </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-slate-900">{displayName}</p>
-              <p className="truncate text-xs text-slate-500">{displayEmail}</p>
+              <p className="wrap-safe text-sm font-semibold leading-tight text-slate-900 sm:truncate sm:whitespace-nowrap">{displayName}</p>
+              <p className="wrap-safe text-xs leading-tight text-slate-500 sm:truncate sm:whitespace-nowrap">{displayEmail}</p>
             </div>
             <MdArrowDropDown className="text-xl text-slate-400" />
           </div>

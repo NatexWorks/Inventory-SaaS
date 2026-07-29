@@ -154,7 +154,7 @@ function SalesChart({ values, labels, title, subtitle }) {
 
           <div className="-mt-2 grid grid-cols-1 gap-2 px-2 text-[11px] text-slate-500 sm:grid-cols-3 xl:grid-cols-6">
             {labels.map((label) => (
-              <span key={label} className="truncate text-center">
+              <span key={label} className="wrap-safe whitespace-normal text-center leading-tight">
                 {label}
               </span>
             ))}
@@ -389,33 +389,33 @@ export default function DashboardClient() {
         </div>
       ) : null}
 
-      <section className="overflow-hidden rounded-[30px] border border-white/70 bg-white/80 p-6 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur">
+      <section className="overflow-visible rounded-[30px] border border-white/70 bg-white/80 p-6 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-sm font-semibold text-indigo-700">
               <FaWarehouse className="text-xs" />
               Inventory SaaS dashboard
             </div>
-            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900">
+            <h1 className="wrap-safe mt-4 text-3xl font-semibold leading-tight tracking-tight text-slate-900">
               Welcome back, {displayName}.
             </h1>
-            <p className="mt-2 max-w-2xl text-sm text-slate-500">
+            <p className="wrap-safe mt-2 max-w-2xl text-sm text-slate-500">
               Here is a live view of your sales, stock movement, and critical alerts for {today}.
             </p>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Today</p>
-              <p className="mt-1 text-sm font-semibold text-slate-900">{today}</p>
+              <p className="wrap-safe text-xs font-medium uppercase tracking-wide text-slate-400">Today</p>
+              <p className="wrap-safe mt-1 text-sm font-semibold leading-tight text-slate-900">{today}</p>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Orders</p>
-              <p className="mt-1 text-sm font-semibold text-slate-900">{summary?.totalSales || 0} completed</p>
+              <p className="wrap-safe text-xs font-medium uppercase tracking-wide text-slate-400">Orders</p>
+              <p className="wrap-safe mt-1 text-sm font-semibold leading-tight text-slate-900">{summary?.totalSales || 0} completed</p>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Alerts</p>
-              <p className="mt-1 text-sm font-semibold text-rose-600">{summary?.lowStockProducts || 0} low stock</p>
+              <p className="wrap-safe text-xs font-medium uppercase tracking-wide text-slate-400">Alerts</p>
+              <p className="wrap-safe mt-1 text-sm font-semibold leading-tight text-rose-600">{summary?.lowStockProducts || 0} low stock</p>
             </div>
           </div>
         </div>
@@ -441,15 +441,15 @@ export default function DashboardClient() {
         <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <h3 className="text-lg font-semibold text-slate-900">Recent Orders</h3>
-              <p className="mt-1 text-sm text-slate-500">Latest purchases from customers.</p>
+              <h3 className="wrap-safe text-lg font-semibold leading-tight text-slate-900">Recent Orders</h3>
+              <p className="wrap-safe mt-1 text-sm text-slate-500">Latest purchases from customers.</p>
             </div>
             <button type="button" className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-600">
               View all
             </button>
           </div>
 
-          <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200">
+          <div className="mt-5 overflow-x-auto rounded-2xl border border-slate-200">
             <table className="min-w-full divide-y divide-slate-200 text-left">
               <thead className="bg-slate-50">
                 <tr className="text-xs uppercase tracking-wide text-slate-500">
@@ -463,10 +463,10 @@ export default function DashboardClient() {
               <tbody className="divide-y divide-slate-100 bg-white">
                 {orderRows.map((order) => (
                   <tr key={order._id} className="text-sm text-slate-700">
-                    <td className="px-4 py-3 font-medium text-slate-900">{order.orderNumber}</td>
-                    <td className="px-4 py-3">{order.customerName}</td>
-                    <td className="px-4 py-3">{dashboardDateTimeFormatter.format(new Date(order.createdAt))}</td>
-                    <td className="px-4 py-3 font-medium text-slate-900">{money(order.totalAmount)}</td>
+                    <td className="wrap-safe px-4 py-3 font-medium leading-tight text-slate-900">{order.orderNumber}</td>
+                    <td className="wrap-safe px-4 py-3 leading-tight">{order.customerName}</td>
+                    <td className="wrap-safe px-4 py-3 leading-tight">{dashboardDateTimeFormatter.format(new Date(order.createdAt))}</td>
+                    <td className="wrap-safe px-4 py-3 font-medium leading-tight text-slate-900">{money(order.totalAmount)}</td>
                     <td className="px-4 py-3">
                       <StatusPill status={order.status} />
                     </td>
@@ -478,8 +478,8 @@ export default function DashboardClient() {
         </div>
 
         <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
-          <h3 className="text-lg font-semibold text-slate-900">Low Stock Alert</h3>
-          <p className="mt-1 text-sm text-slate-500">Items that need restocking before the next rush.</p>
+          <h3 className="wrap-safe text-lg font-semibold leading-tight text-slate-900">Low Stock Alert</h3>
+          <p className="wrap-safe mt-1 text-sm text-slate-500">Items that need restocking before the next rush.</p>
 
           <div className="mt-5 space-y-3">
             {lowStockItems.length === 0 ? (
@@ -491,8 +491,8 @@ export default function DashboardClient() {
                 <div key={item._id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="font-medium text-slate-900">{item.name}</p>
-                      <p className="mt-1 text-sm text-slate-500">SKU {item.sku || "N/A"}</p>
+                      <p className="wrap-safe font-medium leading-tight text-slate-900">{item.name}</p>
+                      <p className="wrap-safe mt-1 text-sm leading-tight text-slate-500">SKU {item.sku || "N/A"}</p>
                     </div>
                     <StatusPill status={item.stock <= 3 ? "Out of Stock" : "Low Stock"} />
                   </div>
@@ -511,8 +511,8 @@ export default function DashboardClient() {
         <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <h3 className="text-lg font-semibold text-slate-900">Top Products</h3>
-              <p className="mt-1 text-sm text-slate-500">Fast movers on the catalog.</p>
+          <h3 className="wrap-safe text-lg font-semibold leading-tight text-slate-900">Top Products</h3>
+          <p className="wrap-safe mt-1 text-sm text-slate-500">Fast movers on the catalog.</p>
             </div>
             <div className="flex items-center gap-2 text-sm text-slate-500">
               <FaEye />
@@ -529,8 +529,8 @@ export default function DashboardClient() {
               topProducts.map((product) => (
                 <div key={product._id} className="flex items-center justify-between rounded-2xl border border-slate-200 px-4 py-3">
                   <div>
-                    <p className="font-medium text-slate-900">{product.name}</p>
-                    <p className="mt-1 text-sm text-slate-500">Stock {product.stock}</p>
+                    <p className="wrap-safe font-medium leading-tight text-slate-900">{product.name}</p>
+                    <p className="wrap-safe mt-1 text-sm leading-tight text-slate-500">Stock {product.stock}</p>
                   </div>
                   <div className="text-right">
                     <p className="font-semibold text-slate-900">{money(product.price)}</p>
@@ -545,8 +545,8 @@ export default function DashboardClient() {
         </div>
 
         <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
-          <h3 className="text-lg font-semibold text-slate-900">Quick Actions</h3>
-          <p className="mt-1 text-sm text-slate-500">Common actions for inventory management.</p>
+          <h3 className="wrap-safe text-lg font-semibold leading-tight text-slate-900">Quick Actions</h3>
+          <p className="wrap-safe mt-1 text-sm text-slate-500">Common actions for inventory management.</p>
 
           <div className="mt-5 grid gap-3">
             {[
@@ -565,7 +565,7 @@ export default function DashboardClient() {
                   <span className={`rounded-xl p-2 ${action.color}`}>
                     <action.icon />
                   </span>
-                  <span className="font-medium text-slate-900">{action.label}</span>
+                  <span className="wrap-safe font-medium leading-tight text-slate-900">{action.label}</span>
                 </span>
                 <FaMinus className="text-slate-300" />
               </button>

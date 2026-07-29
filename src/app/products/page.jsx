@@ -114,7 +114,13 @@ export default function ProductsPage() {
   // This screen manages search, pagination, and delete actions for products.
   const router = useRouter();
   const [products, setProducts] = useState([]);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(() => {
+    if (typeof window === "undefined") {
+      return "";
+    }
+
+    return new URLSearchParams(window.location.search).get("search") || "";
+  });
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -128,13 +134,6 @@ export default function ProductsPage() {
   const [barcodeDrafts, setBarcodeDrafts] = useState([]);
   const [barcodeEditorError, setBarcodeEditorError] = useState("");
   const [barcodeEditorSaving, setBarcodeEditorSaving] = useState(false);
-
-  // Keep the search state aligned with the URL so navbar searches land here cleanly.
-  useEffect(() => {
-    const urlSearch = new URLSearchParams(window.location.search).get("search") || "";
-    setSearch(urlSearch);
-    setPage(1);
-  }, []);
 
   useEffect(() => {
     function handlePopState() {
@@ -419,14 +418,14 @@ export default function ProductsPage() {
               </p>
             </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+            <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
+              <div className="flex w-full min-w-0 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
                 <MdSearch className="text-xl text-slate-400" />
                 <input
                   value={search}
                   onChange={(e) => handleSearchChange(e.target.value)}
                   placeholder="Search products..."
-                  className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400 sm:w-64"
+                  className="min-w-0 flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
                 />
               </div>
 

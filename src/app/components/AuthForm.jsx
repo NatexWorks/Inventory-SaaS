@@ -92,7 +92,7 @@ export default function AuthForm({ mode = "login", redirectPath = "/" }) {
             <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-white/80">
               Inventory SaaS
             </div>
-            <h1 className="mt-6 max-w-md text-4xl font-bold tracking-tight">
+            <h1 className="mt-6 max-w-md text-3xl font-bold leading-tight tracking-tight sm:text-4xl">
               {isSignup ? "Create your store workspace" : "Sign in to your live dashboard"}
             </h1>
             <p className="mt-4 max-w-lg text-sm leading-6 text-white/75">
@@ -119,7 +119,7 @@ export default function AuthForm({ mode = "login", redirectPath = "/" }) {
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-indigo-500">
               {isSignup ? "Create account" : "Welcome back"}
             </p>
-            <h2 className="mt-3 text-3xl font-bold text-slate-900">
+            <h2 className="mt-3 text-2xl font-bold leading-tight text-slate-900 sm:text-3xl">
               {isSignup ? "Start your inventory workspace" : "Login to continue"}
             </h2>
             <p className="mt-2 text-sm text-slate-500">

@@ -539,13 +539,13 @@ export default function OrdersPage() {
               </p>
             </div>
 
-            <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+            <div className="flex w-full min-w-0 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm sm:w-auto">
               <MdSearch className="text-xl text-slate-400" />
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search orders..."
-                className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400 sm:w-64"
+                className="min-w-0 flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
               />
             </div>
           </div>

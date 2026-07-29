@@ -60,7 +60,7 @@ export default function ResetPasswordForm({ token = "" }) {
           <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-white/80">
             Secure reset
           </div>
-          <h1 className="mt-6 text-4xl font-bold tracking-tight">Create a new password</h1>
+          <h1 className="mt-6 text-3xl font-bold leading-tight tracking-tight sm:text-4xl">Create a new password</h1>
           <p className="mt-4 max-w-md text-sm leading-6 text-white/75">
             Choose a strong password. Once saved, your old reset link cannot be used again.
           </p>
@@ -68,7 +68,7 @@ export default function ResetPasswordForm({ token = "" }) {
 
         <section className="rounded-[28px] bg-white p-8 shadow-[0_16px_35px_rgba(15,23,42,0.12)]">
           <p className="text-xs font-semibold uppercase tracking-[0.28em] text-indigo-500">Reset Password</p>
-          <h2 className="mt-3 text-3xl font-bold text-slate-900">Set a new password</h2>
+          <h2 className="mt-3 text-2xl font-bold leading-tight text-slate-900 sm:text-3xl">Set a new password</h2>
           <p className="mt-2 text-sm text-slate-500">
           {token ? "Token detected. You can now reset your password." : "Missing reset token."}
           </p>

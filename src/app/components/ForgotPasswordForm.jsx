@@ -53,7 +53,7 @@ export default function ForgotPasswordForm() {
           <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-white/80">
             Reset access
           </div>
-          <h1 className="mt-6 text-4xl font-bold tracking-tight">Forgot password</h1>
+          <h1 className="mt-6 text-3xl font-bold leading-tight tracking-tight sm:text-4xl">Forgot password</h1>
           <p className="mt-4 max-w-md text-sm leading-6 text-white/75">
             Enter your account email. We will generate a secure reset link so you can create a new password.
           </p>
@@ -64,7 +64,7 @@ export default function ForgotPasswordForm() {
 
         <section className="rounded-[28px] bg-white p-8 shadow-[0_16px_35px_rgba(15,23,42,0.12)]">
           <p className="text-xs font-semibold uppercase tracking-[0.28em] text-indigo-500">Account Recovery</p>
-          <h2 className="mt-3 text-3xl font-bold text-slate-900">Get a reset link</h2>
+          <h2 className="mt-3 text-2xl font-bold leading-tight text-slate-900 sm:text-3xl">Get a reset link</h2>
           <p className="mt-2 text-sm text-slate-500">If the email exists, a reset link will be generated for your account.</p>
 
           <form onSubmit={handleSubmit} className="mt-8 space-y-4">

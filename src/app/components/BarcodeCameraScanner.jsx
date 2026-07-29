@@ -19,10 +19,10 @@ const ZXING_FORMATS = [
 const BARCODE_DETECTOR_FORMATS = ["ean_13", "ean_8", "upc_a", "code_128"];
 
 // A centered band reduces the amount of image data we decode while keeping 1D barcode scanning accurate.
-const ROI_WIDTH_RATIO = 0.82;
-const ROI_HEIGHT_RATIO = 0.38;
-const MAX_SCAN_WIDTH = 960;
-const MIN_SCAN_INTERVAL_MS = 120;
+const ROI_WIDTH_RATIO = 0.68;
+const ROI_HEIGHT_RATIO = 0.24;
+const MAX_SCAN_WIDTH = 640;
+const MIN_SCAN_INTERVAL_MS = 60;
 const DUPLICATE_SUPPRESSION_MS = 1500;
 
 function detectSupport() {
@@ -34,8 +34,24 @@ function detectSupport() {
   );
 }
 
+function isLikelyTouchDevice() {
+  if (typeof navigator === "undefined" || typeof window === "undefined") {
+    return false;
+  }
+
+  return Boolean(
+    navigator.maxTouchPoints > 0 ||
+      window.matchMedia?.("(pointer: coarse)")?.matches ||
+      window.matchMedia?.("(hover: none)")?.matches
+  );
+}
+
 function getInitialCameraValue() {
   if (typeof window === "undefined") {
+    return "mode:environment";
+  }
+
+  if (isLikelyTouchDevice()) {
     return "mode:environment";
   }
 
@@ -81,8 +97,9 @@ function pickBestDetection(detections) {
 
 function buildHighResolutionCandidates(cameraValue) {
   const cameraSelectors = [];
+  const forceRearCamera = isLikelyTouchDevice();
 
-  if (cameraValue.startsWith("device:")) {
+  if (!forceRearCamera && cameraValue.startsWith("device:")) {
     const deviceId = cameraValue.replace("device:", "");
     cameraSelectors.push(
       { deviceId: { exact: deviceId } },
@@ -90,24 +107,20 @@ function buildHighResolutionCandidates(cameraValue) {
       { facingMode: { ideal: "user" } }
     );
   } else {
-    const preferredFacingMode = cameraValue === "mode:user" ? "user" : "environment";
+    const preferredFacingMode = forceRearCamera ? "environment" : cameraValue === "mode:user" ? "user" : "environment";
     const fallbackFacingMode = preferredFacingMode === "user" ? "environment" : "user";
-    cameraSelectors.push(
-      { facingMode: { ideal: preferredFacingMode } },
-      { facingMode: { ideal: fallbackFacingMode } }
-    );
+    cameraSelectors.push({ facingMode: { ideal: preferredFacingMode } });
+
+    if (!forceRearCamera) {
+      cameraSelectors.push({ facingMode: { ideal: fallbackFacingMode } });
+    }
   }
 
   const commonCameraAttempts = [
     {
-      width: { ideal: 1920 },
-      height: { ideal: 1080 },
-      frameRate: { ideal: 30, max: 30 },
-    },
-    {
       width: { ideal: 1280 },
       height: { ideal: 720 },
-      frameRate: { ideal: 24, max: 30 },
+      frameRate: { ideal: 30, max: 30 },
     },
     {
       width: { ideal: 960 },
@@ -164,6 +177,7 @@ export default function BarcodeCameraScanner({ onScan, onStatus, className = "" 
   const [loading, setLoading] = useState(false);
   const [devices, setDevices] = useState([]);
   const [cameraValue, setCameraValue] = useState(() => getInitialCameraValue());
+  const [touchDevice] = useState(() => isLikelyTouchDevice());
   const [torchAvailable, setTorchAvailable] = useState(false);
   const [torchEnabled, setTorchEnabled] = useState(false);
   const [status, setStatus] = useState({ type: "idle", message: "Camera scanner ready" });
@@ -362,14 +376,19 @@ export default function BarcodeCameraScanner({ onScan, onStatus, className = "" 
 
   function drawRoiFrame() {
     const video = videoRef.current;
-    const context = frameContextRef.current;
 
-    if (!video || !context || !video.videoWidth || !video.videoHeight) {
+    if (!video || !video.videoWidth || !video.videoHeight) {
       return null;
     }
 
     const { x, y, width, height } = getScanRectangle(video.videoWidth, video.videoHeight);
     const canvas = getFrameCanvas(width, height);
+    const context = frameContextRef.current;
+
+    if (!context) {
+      return null;
+    }
+
     context.drawImage(video, x, y, width, height, 0, 0, canvas.width, canvas.height);
     return canvas;
   }
@@ -390,6 +409,33 @@ export default function BarcodeCameraScanner({ onScan, onStatus, className = "" 
     setStatus({ type: "success", message: `Detected ${normalizedCode}` });
     onStatusRef.current?.(`Detected ${normalizedCode}`);
     onScanRef.current?.(normalizedCode);
+    if (touchDevice && typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+      navigator.vibrate([40, 30, 40]);
+    }
+
+    if (typeof window !== "undefined") {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtx) {
+          const context = new AudioCtx();
+          const oscillator = context.createOscillator();
+          const gainNode = context.createGain();
+          oscillator.type = "sine";
+          oscillator.frequency.value = 880;
+          gainNode.gain.value = 0.04;
+          oscillator.connect(gainNode);
+          gainNode.connect(context.destination);
+          oscillator.start();
+          oscillator.stop(context.currentTime + 0.08);
+          oscillator.onended = () => {
+            context.close().catch(() => {});
+          };
+        }
+      } catch {
+        // Feedback should never block the scan result.
+      }
+    }
+
     stopCamera({ type: "success", message: `Detected ${normalizedCode}` }, { announce: false });
   }
 
@@ -677,25 +723,31 @@ export default function BarcodeCameraScanner({ onScan, onStatus, className = "" 
 
         {open && supported ? (
           <>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <label className="text-sm font-medium text-slate-600">Camera</label>
-              <div className="flex min-w-0 flex-1 items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
-                <MdFlipCameraIos className="text-slate-400" />
-                <select
-                  value={cameraValue}
-                  onChange={(event) => persistCamera(event.target.value)}
-                  className="w-full bg-transparent text-sm text-slate-700 outline-none"
-                >
-                  <option value="mode:environment">Rear camera</option>
-                  <option value="mode:user">Front camera</option>
-                  {devices.map((device, index) => (
-                    <option key={device.deviceId} value={`device:${device.deviceId}`}>
-                      {cameraLabel(`device:${device.deviceId}`, index, device)}
-                    </option>
-                  ))}
-                </select>
+            {!touchDevice ? (
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <label className="text-sm font-medium text-slate-600">Camera</label>
+                <div className="flex min-w-0 flex-1 items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
+                  <MdFlipCameraIos className="text-slate-400" />
+                  <select
+                    value={cameraValue}
+                    onChange={(event) => persistCamera(event.target.value)}
+                    className="w-full bg-transparent text-sm text-slate-700 outline-none"
+                  >
+                    <option value="mode:environment">Rear camera</option>
+                    <option value="mode:user">Front camera</option>
+                    {devices.map((device, index) => (
+                      <option key={device.deviceId} value={`device:${device.deviceId}`}>
+                        {cameraLabel(`device:${device.deviceId}`, index, device)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                Rear camera auto-selected for faster mobile scanning.
+              </div>
+            )}
 
             <div className="flex flex-wrap gap-2">
               <button
