@@ -12,7 +12,16 @@ const productSchema = new Schema(
     price: { type: Number, required: true, min: 0 },
     costPrice: { type: Number, default: 0, min: 0 },
     stock: { type: Number, required: true, min: 0, default: 0 },
-    sku: { type: String, trim: true, index: true },
+    sku: {
+      type: String,
+      trim: true,
+      default: undefined,
+      set: (value) => {
+        const normalized = String(value || "").trim();
+        return normalized || undefined;
+      },
+      index: true,
+    },
     description: { type: String, default: "" },
     barcodeMode: { type: String, enum: ["UNIT", "PRODUCT"], default: "PRODUCT" },
     barcodes: [
@@ -27,7 +36,15 @@ const productSchema = new Schema(
   { timestamps: true }
 );
 
-productSchema.index({ userId: 1, sku: 1 }, { unique: true, sparse: true });
+productSchema.index(
+  { userId: 1, sku: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      sku: { $type: "string" },
+    },
+  }
+);
 productSchema.index({ userId: 1, name: 1 });
 productSchema.index({ userId: 1, category: 1 });
 

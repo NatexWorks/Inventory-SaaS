@@ -40,7 +40,7 @@ export async function PATCH(request, { params }) {
       session = await Session.findOneAndUpdate(
         { sessionId: id, userId: auth.userId },
         { $set: body },
-        { new: true }
+        { returnDocument: "after" }
       );
     }
 

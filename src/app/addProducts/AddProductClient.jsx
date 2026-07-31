@@ -5,7 +5,7 @@ import ProductForm from "../components/productForm";
 import { fetchCategories } from "../components/productFetch";
 
 export default function AddProductClient({ id }) {
-  const [Form, setFormData] = useState({
+  const initialFormState = {
     name: "",
     price: "",
     stock: "",
@@ -14,6 +14,9 @@ export default function AddProductClient({ id }) {
     sku: "",
     description: "",
     manualBarcodes: "",
+  };
+  const [Form, setFormData] = useState({
+    ...initialFormState,
   });
   const [categories, setCategories] = useState([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
@@ -143,6 +146,12 @@ export default function AddProductClient({ id }) {
           throw new Error(responsePayload?.message || "Failed to add product");
         }
       }
+
+      if (!id) {
+        setFormData({ ...initialFormState });
+        setExistingBarcodeCount(0);
+        setBarcodeNotice("");
+      }
     } catch (error) {
       setSubmitError(error.message || "Something went wrong");
       console.error(error);
@@ -154,7 +163,11 @@ export default function AddProductClient({ id }) {
     let active = true;
 
     async function loadProduct() {
-      if (!id) return;
+      if (!id) {
+        setFormData({ ...initialFormState });
+        setExistingBarcodeCount(0);
+        return;
+      }
 
       const res = await fetch(`/api/product/${id}`, {
         credentials: "include",

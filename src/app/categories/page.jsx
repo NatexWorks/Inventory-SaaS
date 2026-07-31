@@ -19,36 +19,36 @@ function CategoryCard({ category, productCount, stock, onEdit, onDelete, deletin
   const canDelete = productCount === 0;
 
   return (
-    <article className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
+    <article className="rounded-3xl border border-slate-200/80 bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-500">Category</p>
-          <h3 className="mt-2 text-xl font-semibold text-slate-900">{category.name}</h3>
-          <p className="mt-2 text-sm text-slate-500">{category.description || "No description yet"}</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-indigo-500">Category</p>
+          <h3 className="mt-1 text-lg font-semibold text-slate-900">{category.name}</h3>
+          <p className="mt-1 text-sm text-slate-500">{category.description || "No description yet"}</p>
         </div>
-        <div className="rounded-2xl bg-indigo-50 p-3 text-indigo-600">
-          <MdCategory className="text-2xl" />
+        <div className="rounded-2xl bg-indigo-50 p-2.5 text-indigo-600">
+          <MdCategory className="text-xl" />
         </div>
       </div>
 
-      <div className="mt-5 grid grid-cols-2 gap-3">
-        <div className="rounded-2xl bg-slate-50 p-3">
+      <div className="mt-4 grid grid-cols-2 gap-2.5">
+        <div className="rounded-2xl bg-slate-50 p-2.5">
           <p className="text-xs text-slate-500">Products</p>
-          <p className="mt-1 text-lg font-semibold text-slate-900">{productCount}</p>
+          <p className="mt-1 text-base font-semibold text-slate-900">{productCount}</p>
         </div>
-        <div className="rounded-2xl bg-slate-50 p-3">
+        <div className="rounded-2xl bg-slate-50 p-2.5">
           <p className="text-xs text-slate-500">Stock</p>
-          <p className="mt-1 text-lg font-semibold text-slate-900">{stock}</p>
+          <p className="mt-1 text-base font-semibold text-slate-900">{stock}</p>
         </div>
       </div>
 
-      <div className="mt-5 flex items-center justify-between gap-3">
+      <div className="mt-4 flex items-center justify-between gap-3">
         <span className="text-xs text-slate-500">{canDelete ? "Safe to delete" : "Has linked products"}</span>
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => onEdit(category)}
-            className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700"
+            className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700"
           >
             <MdEdit />
             Edit
@@ -57,7 +57,7 @@ function CategoryCard({ category, productCount, stock, onEdit, onDelete, deletin
             type="button"
             disabled={!canDelete || deleting}
             onClick={() => onDelete(category)}
-            className="inline-flex items-center gap-2 rounded-2xl border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-2xl border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <MdDelete />
             Delete
@@ -73,6 +73,7 @@ export default function CategoriesPage() {
   const [categories, setCategories] = useState([]);
   const [productCounts, setProductCounts] = useState([]);
   const [search, setSearch] = useState("");
+  const [showAllCategories, setShowAllCategories] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState("");
@@ -132,6 +133,14 @@ export default function CategoriesPage() {
       })
       .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
   }, [categories, search]);
+
+  const displayedCategories = useMemo(() => {
+    if (showAllCategories || visibleCategories.length <= 4) {
+      return visibleCategories;
+    }
+
+    return visibleCategories.slice(0, 4);
+  }, [showAllCategories, visibleCategories]);
 
   const totals = useMemo(() => {
     // All the top summary values are derived from the loaded lists.
@@ -334,7 +343,7 @@ export default function CategoriesPage() {
             {loading ? (
               <div className="grid gap-4 p-5 md:grid-cols-2">
                 {Array.from({ length: 4 }, (_, index) => (
-                  <div key={index} className="h-48 animate-pulse rounded-3xl bg-slate-100" />
+                  <div key={index} className="h-40 animate-pulse rounded-3xl bg-slate-100" />
                 ))}
               </div>
             ) : visibleCategories.length === 0 ? (
@@ -355,21 +364,35 @@ export default function CategoriesPage() {
                 </Link>
               </div>
             ) : (
-              <div className="grid gap-4 p-5 md:grid-cols-2">
-                {visibleCategories.map((category) => {
-                  const stats = countByCategory.get(String(category._id)) || {};
-                  return (
-                    <CategoryCard
-                      key={category._id}
-                      category={category}
-                      productCount={Number(stats.count || 0)}
-                      stock={Number(stats.stock || 0)}
-                      onEdit={beginEdit}
-                      onDelete={handleDelete}
-                      deleting={Boolean(deletingId)}
-                    />
-                  );
-                })}
+              <div className="p-5">
+                <div className="grid gap-4 md:grid-cols-2">
+                  {displayedCategories.map((category) => {
+                    const stats = countByCategory.get(String(category._id)) || {};
+                    return (
+                      <CategoryCard
+                        key={category._id}
+                        category={category}
+                        productCount={Number(stats.count || 0)}
+                        stock={Number(stats.stock || 0)}
+                        onEdit={beginEdit}
+                        onDelete={handleDelete}
+                        deleting={Boolean(deletingId)}
+                      />
+                    );
+                  })}
+                </div>
+
+                {visibleCategories.length > 4 ? (
+                  <div className="mt-4 flex justify-center">
+                    <button
+                      type="button"
+                      onClick={() => setShowAllCategories((current) => !current)}
+                      className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700"
+                    >
+                      {showAllCategories ? "View less" : "View all"}
+                    </button>
+                  </div>
+                ) : null}
               </div>
             )}
           </div>

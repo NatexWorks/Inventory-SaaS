@@ -29,7 +29,7 @@ export async function PATCH(request, { params }) {
     const order = await Order.findOneAndUpdate(
       { _id: id, userId: auth.userId, status: { $ne: "COMPLETED" } },
       { $set: body },
-      { new: true, runValidators: true }
+      { returnDocument: "after", runValidators: true }
     );
 
     if (!order) {

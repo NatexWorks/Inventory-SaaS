@@ -9,6 +9,19 @@ import { upsertCategoryFromName } from "./categoryService";
 import { getSettings } from "./settingsService";
 import crypto from "node:crypto";
 
+let productIndexSyncPromise = null;
+
+async function ensureProductIndexes() {
+  if (!productIndexSyncPromise) {
+    productIndexSyncPromise = Product.syncIndexes().catch((error) => {
+      productIndexSyncPromise = null;
+      throw error;
+    });
+  }
+
+  return productIndexSyncPromise;
+}
+
 function normalizeBarcodes(barcodes = []) {
   return Array.from(
     new Map(
@@ -139,6 +152,7 @@ export async function getProductById(userId, id) {
 
 export async function createProduct(userId, input) {
   await dbConnect();
+  await ensureProductIndexes();
   const payload = productSchema.parse({ ...input, userId });
   await assertBarcodePolicy(userId, payload.barcodes || []);
   const category = payload.categoryId
@@ -172,6 +186,7 @@ export async function createProduct(userId, input) {
 
 export async function updateProduct(userId, id, input) {
   await dbConnect();
+  await ensureProductIndexes();
   const payload = productSchema.partial().parse(input);
   const existing = await Product.findOne({ _id: id, userId }).lean();
   if (!existing) {
@@ -205,7 +220,7 @@ export async function updateProduct(userId, id, input) {
   const product = await Product.findOneAndUpdate(
     { _id: id, userId },
     { $set: update },
-    { returnDocument:"after", runValidators: true }
+    { returnDocument: "after", runValidators: true }
   );
 
   if (!product) {

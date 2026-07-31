@@ -35,7 +35,7 @@ export async function registerUser(input) {
   await Settings.findOneAndUpdate(
     { userId: user._id },
     { $setOnInsert: { userId: user._id } },
-    { upsert: true, returnDocument:"after"}
+    { upsert: true, returnDocument: "after" }
   );
 
   const token = signToken(createAuthPayload(user));
@@ -63,7 +63,7 @@ export async function saveMagicLinkRequest(input) {
         consumedAt: null,
       },
     },
-    { upsert: true, new: true }
+    { upsert: true, returnDocument: "after" }
   );
 
   return {
@@ -103,7 +103,7 @@ export async function consumeMagicLinkRequest(email, fallbackName = "") {
         passwordHash: crypto.randomBytes(32).toString("hex"),
       },
     },
-    { upsert: true, new: true }
+    { upsert: true, returnDocument: "after" }
   );
 
   if (pending) {

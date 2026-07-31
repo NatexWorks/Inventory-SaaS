@@ -152,7 +152,7 @@ export async function upsertCategoryFromName(userId, categoryName) {
   return Category.findOneAndUpdate(
     { userId, slug },
     { $setOnInsert: { userId, name, slug } },
-    { upsert: true, new: true }
+    { upsert: true, returnDocument: "after" }
   );
 }
 
