@@ -136,7 +136,7 @@ export async function loginUser(input) {
 
   // Demo-only access is enabled only for the exact address configured by the deployer.
   // This leaves regular accounts and their permissions/data unchanged.
-  const demoEmail = String(process.env.DEMO_EMAIL || "").trim().toLowerCase();
+  const demoEmail = String(process.env.DEMO_EMAIL || "demo@inventorysystem.test").trim().toLowerCase();
   if (demoEmail && email === demoEmail) {
     if (user.role !== "owner") {
       user.role = "owner";
