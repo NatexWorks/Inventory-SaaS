@@ -13,6 +13,7 @@ import {
 } from "../lib/validation";
 import { comparePassword, createAuthPayload, hashPassword, signToken } from "../lib/security";
 import crypto from "node:crypto";
+import { seedDemoWorkspace } from "./demoWorkspaceService";
 
 export async function registerUser(input) {
   await dbConnect();
@@ -131,6 +132,26 @@ export async function loginUser(input) {
   const valid = await comparePassword(payload.password, user.passwordHash);
   if (!valid) {
     throw new UnauthorizedError("Invalid credentials");
+  }
+
+  // Demo-only access is enabled only for the exact address configured by the deployer.
+  // This leaves regular accounts and their permissions/data unchanged.
+  const demoEmail = String(process.env.DEMO_EMAIL || "demo@inventorysystem.test").trim().toLowerCase();
+  if (demoEmail && email === demoEmail) {
+    if (user.role !== "owner") {
+      user.role = "owner";
+      await user.save();
+    }
+
+    // Keep the login available even if seeding needs a retry; all inserts are idempotent.
+    try {
+      await seedDemoWorkspace(user._id);
+    } catch (seedError) {
+      console.error(
+        "Unable to seed configured demo workspace:",
+        seedError instanceof Error ? seedError.message : seedError
+      );
+    }
   }
 
   const token = signToken(createAuthPayload(user));
